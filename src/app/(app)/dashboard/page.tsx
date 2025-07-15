@@ -78,38 +78,38 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent className="flex-grow flex flex-col overflow-hidden">
-          <ScrollArea className="w-full h-full whitespace-nowrap">
-            <div className="flex h-full">
-              {/* Task Names and Subtotal Column */}
-              <div className="sticky left-0 bg-card z-20 flex border-r">
-                 {/* Task Names Column */}
-                <div className="pr-4">
-                  <div className="h-16 flex items-end pb-1 font-semibold">태스크</div>
-                  {tasks.map((task) => {
-                    const Icon = getIcon(task.icon);
-                    return (
-                      <div key={task.id} className="h-12 flex items-center gap-2 text-sm font-medium pr-2">
-                         <div className="p-1.5 rounded-md" style={{ backgroundColor: `${task.color}20`}}>
-                          <Icon className="w-5 h-5" style={{ color: task.color }} />
-                         </div>
-                         <span className="truncate w-24">{task.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-                 {/* Subtotal Column */}
-                <div className="pr-4 border-l">
-                    <div className="h-16 flex items-end justify-center pb-1 font-semibold">소계</div>
-                    {tasks.map((task, index) => (
-                        <div key={task.id} className="h-12 flex items-center justify-center text-sm font-bold">
-                            {subtotalForAllTasks[index]}
-                        </div>
-                    ))}
-                </div>
+          <div className="flex h-full">
+            {/* Task Names and Subtotal Column */}
+            <div className="sticky left-0 bg-card z-20 flex border-r">
+               {/* Task Names Column */}
+              <div className="pr-4">
+                <div className="h-16 flex items-end pb-1 font-semibold">태스크</div>
+                {tasks.map((task) => {
+                  const Icon = getIcon(task.icon);
+                  return (
+                    <div key={task.id} className="h-12 flex items-center gap-2 text-sm font-medium pr-2">
+                       <div className="p-1.5 rounded-md" style={{ backgroundColor: `${task.color}20`}}>
+                        <Icon className="w-5 h-5" style={{ color: task.color }} />
+                       </div>
+                       <span className="truncate w-24">{task.name}</span>
+                    </div>
+                  );
+                })}
               </div>
+               {/* Subtotal Column */}
+              <div className="pr-4 border-l">
+                  <div className="h-16 flex items-end justify-center pb-1 font-semibold">소계</div>
+                  {tasks.map((task, index) => (
+                      <div key={task.id} className="h-12 flex items-center justify-center text-sm font-bold">
+                          {subtotalForAllTasks[index]}
+                      </div>
+                  ))}
+              </div>
+            </div>
 
-              {/* Calendar Grid */}
-              <div className="flex-grow">
+            {/* Calendar Grid */}
+            <ScrollArea className="w-full h-full whitespace-nowrap">
+              <div className="flex-grow h-full">
                 <div className="grid h-full" style={{ gridTemplateColumns: `repeat(${daysInMonth.length}, minmax(44px, 1fr))`, gridTemplateRows: `4rem repeat(${tasks.length}, 3rem)`}}>
                   {/* Header Row - Dates */}
                   {daysInMonth.map((day) => (
@@ -154,9 +154,9 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </div>
-            </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
+          </div>
         </CardContent>
       </Card>
     </div>
