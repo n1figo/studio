@@ -14,7 +14,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { mockTasks, mockDailyRecords } from '@/lib/mock-data';
 import { getIcon } from '@/lib/icons';
 import { cn } from '@/lib/utils';
@@ -52,7 +52,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle>{format(currentDate, 'yyyy년 MMMM', { locale: ko })}</CardTitle>
-              <CardDescription>모든 날짜를 보려면 가로로 스크롤하세요.</CardDescription>
+              <CardDescription>모든 태스크를 보려면 가로로 스크롤하세요.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={handlePrevMonth}>
@@ -67,34 +67,36 @@ export default function DashboardPage() {
         <CardContent>
           <ScrollArea className="w-full whitespace-nowrap">
             <div className="relative">
-              <div className="grid gap-2" style={{ gridTemplateColumns: `150px repeat(${daysInMonth.length}, 40px)` }}>
-                {/* Header Row */}
-                <div className="sticky left-0 z-10 bg-card font-semibold flex items-end">태스크</div>
-                {daysInMonth.map((day) => (
-                  <div key={day.toString()} className="flex flex-col items-center justify-end font-semibold">
-                    <span className="text-xs">{format(day, 'E', { locale: ko })}</span>
-                    <span>{format(day, 'd')}</span>
-                  </div>
-                ))}
-                
-                {/* Task Rows */}
+              <div className="grid gap-2" style={{ gridTemplateColumns: `80px repeat(${tasks.length}, 1fr)`}}>
+                {/* Header Row - Tasks */}
+                <div className="sticky left-0 z-10 bg-card font-semibold flex items-end">날짜</div>
                 {tasks.map((task) => {
                   const Icon = getIcon(task.icon);
                   return (
-                    <>
-                      <div key={task.id} className="sticky left-0 z-10 bg-card flex items-center gap-2 text-sm font-medium py-2 pr-2 truncate">
-                        <Icon className="w-5 h-5 shrink-0" style={{ color: task.color }} />
-                        <span className="truncate">{task.name}</span>
-                      </div>
-                      {daysInMonth.map((day) => {
-                        const dateString = format(day, 'yyyy-MM-dd');
-                        const status = records[task.id]?.[dateString] || ' ';
-                        const statusLabel = status === 'O' ? '성공' : status === 'X' ? '실패' : '대기 중';
-                        
-                        return (
-                          <TooltipProvider key={`${task.id}-${day.toString()}`} delayDuration={100}>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
+                    <div key={task.id} className="flex flex-col items-center justify-end font-semibold text-center gap-1 pb-1">
+                      <Icon className="w-5 h-5" style={{ color: task.color }} />
+                      <span className="text-xs truncate w-full">{task.name}</span>
+                    </div>
+                  );
+                })}
+
+                {/* Date Rows */}
+                {daysInMonth.map((day) => (
+                  <>
+                    <div key={day.toString()} className="sticky left-0 z-10 bg-card flex items-center gap-2 text-sm font-medium py-2 pr-2">
+                       <span className="font-semibold">{format(day, 'd일')}</span>
+                       <span className="text-xs text-muted-foreground">{format(day, 'E', { locale: ko })}</span>
+                    </div>
+                    {tasks.map((task) => {
+                      const dateString = format(day, 'yyyy-MM-dd');
+                      const status = records[task.id]?.[dateString] || ' ';
+                      const statusLabel = status === 'O' ? '성공' : status === 'X' ? '실패' : '대기 중';
+
+                      return (
+                        <TooltipProvider key={`${task.id}-${day.toString()}`} delayDuration={100}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex justify-center">
                                 <div
                                   className={cn(
                                     'w-10 h-10 rounded-md flex items-center justify-center font-bold text-lg',
@@ -103,18 +105,18 @@ export default function DashboardPage() {
                                 >
                                   {status !== ' ' && status}
                                 </div>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{`${task.name} - ${format(day, 'MMM d일', { locale: ko })}`}</p>
-                                <p>상태: {statusLabel}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        );
-                      })}
-                    </>
-                  );
-                })}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{`${task.name} - ${format(day, 'MMM d일', { locale: ko })}`}</p>
+                              <p>상태: {statusLabel}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    })}
+                  </>
+                ))}
               </div>
             </div>
             <ScrollBar orientation="horizontal" />
