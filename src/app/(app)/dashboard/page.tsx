@@ -80,30 +80,32 @@ export default function DashboardPage() {
         <CardContent className="flex-grow flex flex-col overflow-hidden">
           <div className="flex h-full">
             {/* Task Names and Subtotal Column */}
-            <div className="sticky left-0 bg-card z-20 flex border-r">
-               {/* Task Names Column */}
-              <div className="pr-4">
-                <div className="h-16 flex items-end pb-1 font-semibold">태스크</div>
-                {tasks.map((task) => {
+            <div className="sticky left-0 bg-card z-10 flex flex-col border-r">
+              <div className="flex">
+                <div className="pr-4 w-40">
+                  <div className="h-16 flex items-end pb-1 font-semibold">태스크</div>
+                </div>
+                <div className="pr-4 border-l w-20">
+                    <div className="h-16 flex items-end justify-center pb-1 font-semibold">소계</div>
+                </div>
+              </div>
+              <div className="flex-grow">
+                {tasks.map((task, index) => {
                   const Icon = getIcon(task.icon);
                   return (
-                    <div key={task.id} className="h-12 flex items-center gap-2 text-sm font-medium pr-2">
-                       <div className="p-1.5 rounded-md" style={{ backgroundColor: `${task.color}20`}}>
-                        <Icon className="w-5 h-5" style={{ color: task.color }} />
-                       </div>
-                       <span className="truncate w-24">{task.name}</span>
+                    <div key={task.id} className="flex">
+                      <div className="h-12 flex items-center gap-2 text-sm font-medium pr-2 w-40">
+                        <div className="p-1.5 rounded-md" style={{ backgroundColor: `${task.color}20`}}>
+                          <Icon className="w-5 h-5" style={{ color: task.color }} />
+                        </div>
+                        <span className="truncate flex-1">{task.name}</span>
+                      </div>
+                      <div className="h-12 flex items-center justify-center text-sm font-bold pr-4 border-l w-20">
+                          {subtotalForAllTasks[index]}
+                      </div>
                     </div>
                   );
                 })}
-              </div>
-               {/* Subtotal Column */}
-              <div className="pr-4 border-l">
-                  <div className="h-16 flex items-end justify-center pb-1 font-semibold">소계</div>
-                  {tasks.map((task, index) => (
-                      <div key={task.id} className="h-12 flex items-center justify-center text-sm font-bold">
-                          {subtotalForAllTasks[index]}
-                      </div>
-                  ))}
               </div>
             </div>
 
@@ -115,7 +117,7 @@ export default function DashboardPage() {
                   {daysInMonth.map((day) => (
                     <div key={day.toString()} className="flex flex-col items-center justify-end font-semibold text-center gap-1 pb-1">
                       <span className="text-xs text-muted-foreground">{format(day, 'E', { locale: ko })}</span>
-                      <span className="font-semibold">{format(day, 'd일')}</span>
+                      <span className="font-semibold">{format(day, 'd')}</span>
                     </div>
                   ))}
 
