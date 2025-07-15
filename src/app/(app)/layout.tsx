@@ -12,6 +12,7 @@ import {
   SidebarFooter,
   SidebarTrigger,
   SidebarMenuAction,
+  useSidebar
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Home, Settings, Plus, Star, Pencil, Check, X } from 'lucide-react';
@@ -23,9 +24,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { Task } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
-
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
   // In a real app, this data would come from an API call
@@ -33,6 +34,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskName, setEditingTaskName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const { state: sidebarState } = useSidebar();
 
   useEffect(() => {
     if (editingTaskId && inputRef.current) {
@@ -77,121 +79,129 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 
   return (
+    <>
+      <Sidebar>
+        <SidebarHeader>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="p-1.5 bg-primary/20 rounded-lg">
+                <Star className="text-primary" />
+              </div>
+              <h1 className="text-xl font-semibold">태스크 포지</h1>
+            </Link>
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <Link href="/dashboard">
+                <SidebarMenuButton tooltip="대시보드" isActive={pathname === '/dashboard'}>
+                  <Home />
+                  <span>대시보드</span>
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <Link href="/manage-tasks">
+                <SidebarMenuButton tooltip="태스크 관리" isActive={pathname === '/manage-tasks'}>
+                  <Settings />
+                  <span>태스크 관리</span>
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+          </SidebarMenu>
+
+          <div className="mt-4 px-2 text-sm font-semibold text-muted-foreground group-data-[collapsed=true]:hidden">
+            내 태스크
+          </div>
+          <SidebarMenu>
+            {tasks.map((task) => {
+              const Icon = getIcon(task.icon);
+              const isEditing = editingTaskId === task.id;
+              return (
+                <SidebarMenuItem key={task.id}>
+                  {isEditing ? (
+                    <div className="flex w-full items-center gap-1 px-2">
+                      <Icon className="h-4 w-4 shrink-0" style={{ color: task.color }} />
+                      <Input
+                        ref={inputRef}
+                        value={editingTaskName}
+                        onChange={(e) => setEditingTaskName(e.target.value)}
+                        onKeyDown={handleInputKeyDown}
+                        onBlur={handleCancelEdit}
+                        className="h-7 flex-grow"
+                      />
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleSaveEdit}>
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleCancelEdit}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Link href={`/tasks/${task.id}`}>
+                      <SidebarMenuButton tooltip={task.name} isActive={pathname === `/tasks/${task.id}`}>
+                        <Icon style={{ color: task.color }} />
+                        <span>{task.name}</span>
+                         <SidebarMenuAction
+                            showOnHover
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleEditClick(task);
+                            }}
+                          >
+                            <Pencil />
+                          </SidebarMenuAction>
+                      </SidebarMenuButton>
+                    </Link>
+                  )}
+                </SidebarMenuItem>
+              );
+            })}
+            <SidebarMenuItem>
+              <Link href="/manage-tasks">
+                <SidebarMenuButton variant="outline">
+                  <Plus />
+                  <span>새 태스크</span>
+                </SidebarMenuButton>
+              </Link>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarContent>
+        <SidebarFooter>
+          <div className="flex items-center gap-3">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src="https://placehold.co/40x40" alt="사용자 아바타" data-ai-hint="user avatar" />
+              <AvatarFallback>U</AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col group-data-[collapsed=true]:hidden">
+              <span className="font-semibold text-sm">사용자</span>
+              <span className="text-xs text-muted-foreground">user@taskforge.com</span>
+            </div>
+          </div>
+        </SidebarFooter>
+      </Sidebar>
+      <div className={cn("flex flex-1 flex-col transition-[margin-left] duration-300 ease-in-out", sidebarState === 'collapsed' ? "md:ml-16" : "md:ml-64")}>
+        <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-card px-6 sticky top-0 z-30">
+           <div className="flex-1">
+               <SidebarTrigger className="md:hidden" />
+           </div>
+        </header>
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </>
+  );
+}
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
     <SidebarProvider>
       <div className="flex min-h-screen bg-muted/40">
-        <Sidebar>
-          <SidebarHeader>
-            <div className="flex items-center gap-2">
-              <Link href="/dashboard" className="flex items-center gap-2">
-                <div className="p-1.5 bg-primary/20 rounded-lg">
-                  <Star className="text-primary" />
-                </div>
-                <h1 className="text-xl font-semibold">태스크 포지</h1>
-              </Link>
-            </div>
-          </SidebarHeader>
-          <SidebarContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <Link href="/dashboard">
-                  <SidebarMenuButton tooltip="대시보드" isActive={pathname === '/dashboard'}>
-                    <Home />
-                    <span>대시보드</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <Link href="/manage-tasks">
-                  <SidebarMenuButton tooltip="태스크 관리" isActive={pathname === '/manage-tasks'}>
-                    <Settings />
-                    <span>태스크 관리</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            </SidebarMenu>
-
-            <div className="mt-4 px-2 text-sm font-semibold text-muted-foreground group-data-[collapsed=true]:hidden">
-              내 태스크
-            </div>
-            <SidebarMenu>
-              {tasks.map((task) => {
-                const Icon = getIcon(task.icon);
-                const isEditing = editingTaskId === task.id;
-                return (
-                  <SidebarMenuItem key={task.id}>
-                    {isEditing ? (
-                      <div className="flex w-full items-center gap-1 px-2">
-                        <Icon className="h-4 w-4 shrink-0" style={{ color: task.color }} />
-                        <Input
-                          ref={inputRef}
-                          value={editingTaskName}
-                          onChange={(e) => setEditingTaskName(e.target.value)}
-                          onKeyDown={handleInputKeyDown}
-                          onBlur={handleCancelEdit}
-                          className="h-7 flex-grow"
-                        />
-                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleSaveEdit}>
-                          <Check className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={handleCancelEdit}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Link href={`/tasks/${task.id}`}>
-                        <SidebarMenuButton tooltip={task.name} isActive={pathname === `/tasks/${task.id}`}>
-                          <Icon style={{ color: task.color }} />
-                          <span>{task.name}</span>
-                           <SidebarMenuAction
-                              showOnHover
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleEditClick(task);
-                              }}
-                            >
-                              <Pencil />
-                            </SidebarMenuAction>
-                        </SidebarMenuButton>
-                      </Link>
-                    )}
-                  </SidebarMenuItem>
-                );
-              })}
-              <SidebarMenuItem>
-                <Link href="/manage-tasks">
-                  <SidebarMenuButton variant="outline">
-                    <Plus />
-                    <span>새 태스크</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarContent>
-          <SidebarFooter>
-            <div className="flex items-center gap-3">
-              <Avatar className="h-8 w-8">
-                <AvatarImage src="https://placehold.co/40x40" alt="사용자 아바타" data-ai-hint="user avatar" />
-                <AvatarFallback>U</AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col group-data-[collapsed=true]:hidden">
-                <span className="font-semibold text-sm">사용자</span>
-                <span className="text-xs text-muted-foreground">user@taskforge.com</span>
-              </div>
-            </div>
-          </SidebarFooter>
-        </Sidebar>
-        <div className="flex-1 flex flex-col w-0">
-          <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-card px-6 sticky top-0 z-30">
-             <div className="flex-1">
-                 <SidebarTrigger className="md:hidden" />
-             </div>
-          </header>
-          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
-            {children}
-          </main>
-        </div>
+        <AppLayoutContent>{children}</AppLayoutContent>
       </div>
     </SidebarProvider>
-  );
+  )
 }
