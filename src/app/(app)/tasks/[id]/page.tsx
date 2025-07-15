@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -15,13 +15,35 @@ import { mockTasks, mockPosts } from '@/lib/mock-data';
 import type { Post } from '@/lib/types';
 import { getIcon } from '@/lib/icons';
 
+const POSTS_STORAGE_KEY = 'taskforge-posts';
+
 export default function TaskBoardPage() {
   const params = useParams();
   const taskId = params.id as string;
   const { toast } = useToast();
 
-  const [posts, setPosts] = useState<Post[]>(mockPosts.filter(p => p.taskId === taskId));
+  const [posts, setPosts] = useState<Post[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const storedPosts = localStorage.getItem(POSTS_STORAGE_KEY);
+      if (storedPosts) {
+        setPosts(JSON.parse(storedPosts));
+      } else {
+        localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(mockPosts));
+        setPosts(mockPosts);
+      }
+    } catch (error) {
+      console.error("Failed to access localStorage", error);
+      setPosts(mockPosts);
+    }
+  }, []);
+
+  const taskPosts = useMemo(() => {
+    return posts.filter(p => p.taskId === taskId)
+      .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [posts, taskId]);
 
   const task = useMemo(() => mockTasks.find(t => t.id === taskId), [taskId]);
   
@@ -29,20 +51,35 @@ export default function TaskBoardPage() {
     return <div className="text-center">태스크를 찾을 수 없습니다.</div>;
   }
 
-  const handleSavePost = (newPost: Omit<Post, 'id' | 'taskId' | 'createdAt'>) => {
-    const post: Post = {
-      ...newPost,
+  const handleSavePost = (newPostData: Omit<Post, 'id' | 'taskId' | 'createdAt'>) => {
+    const newPost: Post = {
+      ...newPostData,
       id: new Date().toISOString(),
       taskId: task.id,
-      createdAt: new Date(),
+      createdAt: new Date().toISOString(),
     };
-    setPosts(prev => [post, ...prev]);
+    
+    const updatedPosts = [newPost, ...posts];
+    setPosts(updatedPosts);
+    try {
+      localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(updatedPosts));
+    } catch(error) {
+        console.error("Failed to save to localStorage", error);
+    }
+
     toast({ title: '게시물 생성됨', description: '진행 상황이 기록되었습니다.' });
     setIsDialogOpen(false);
   };
   
   const handleDeletePost = (postId: string) => {
-    setPosts(posts.filter((post) => post.id !== postId));
+    const updatedPosts = posts.filter((post) => post.id !== postId);
+    setPosts(updatedPosts);
+    try {
+      localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(updatedPosts));
+    } catch(error) {
+        console.error("Failed to save to localStorage", error);
+    }
+    
     toast({
       title: '게시물 삭제됨',
       description: '게시물이 성공적으로 삭제되었습니다.',
@@ -75,16 +112,15 @@ export default function TaskBoardPage() {
       </header>
 
       <div className="space-y-4">
-        {posts.length > 0 ? (
-          posts
-          .sort((a,b) => b.createdAt.getTime() - a.createdAt.getTime())
+        {taskPosts.length > 0 ? (
+          taskPosts
           .map((post) => (
             <Card key={post.id}>
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle>{post.title}</CardTitle>
-                    <CardDescription>{format(post.createdAt, 'yyyy년 MMMM d일 - a h:mm', { locale: ko })}</CardDescription>
+                    <CardDescription>{format(new Date(post.createdAt), 'yyyy년 MMMM d일 - a h:mm', { locale: ko })}</CardDescription>
                   </div>
                   <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeletePost(post.id)}>
                     <Trash2 className="h-4 w-4" />

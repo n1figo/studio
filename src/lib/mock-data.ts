@@ -1,5 +1,5 @@
 import type { Task, Post, DailyRecord } from './types';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 
 export const mockTasks: Task[] = [
   { id: '1', name: '책 읽기', icon: 'book', color: 'hsl(347, 89%, 60%)', description: '매일 최소 10페이지의 책을 읽으세요.' },
@@ -11,13 +11,13 @@ export const mockTasks: Task[] = [
 ];
 
 export const mockPosts: Post[] = [
-  { id: 'p1', taskId: '1', title: '"듄" 읽기', content: '3장 완료. 세계관이 정말 대단하다.', createdAt: new Date(new Date().setDate(new Date().getDate() - 2)) },
-  { id: 'p2', taskId: '2', title: 'Two Sum 문제', content: '해시 맵을 사용해서 해결했다. 꽤 간단했다.', createdAt: new Date(new Date().setDate(new Date().getDate() - 2)) },
-  { id: 'p3', taskId: '1', title: '"듄" 계속 읽기', content: '폴 아트레이드는 정말 매력적인 주인공이다.', createdAt: new Date(new Date().setDate(new Date().getDate() - 1)) },
-  { id: 'p4', taskId: '3', title: '하체 운동', content: '스쿼트와 런지에 집중했다. 불타는 느낌!', createdAt: new Date(new Date().setDate(new Date().getDate() - 1)) },
-  { id: 'p5', taskId: '4', title: '아침 생각', content: '다가오는 한 주의 목표에 대해 썼다.', createdAt: new Date(new Date().setDate(new Date().getDate() - 1)) },
-  { id: 'p6', taskId: '2', title: 'JS 알고리즘', content: '팩토리얼 함수로 재귀를 연습했다.', createdAt: new Date() },
-  { id: 'p7', taskId: '5', title: '여행 어휘', content: '음식 주문에 필요한 새로운 표현을 배웠다.', createdAt: new Date() },
+  { id: 'p1', taskId: '1', title: '"듄" 읽기', content: '3장 완료. 세계관이 정말 대단하다.', createdAt: subDays(new Date(), 2).toISOString() },
+  { id: 'p2', taskId: '2', title: 'Two Sum 문제', content: '해시 맵을 사용해서 해결했다. 꽤 간단했다.', createdAt: subDays(new Date(), 2).toISOString() },
+  { id: 'p3', taskId: '1', title: '"듄" 계속 읽기', content: '폴 아트레이드는 정말 매력적인 주인공이다.', createdAt: subDays(new Date(), 1).toISOString() },
+  { id: 'p4', taskId: '3', title: '하체 운동', content: '스쿼트와 런지에 집중했다. 불타는 느낌!', createdAt: subDays(new Date(), 1).toISOString() },
+  { id: 'p5', taskId: '4', title: '아침 생각', content: '다가오는 한 주의 목표에 대해 썼다.', createdAt: subDays(new Date(), 1).toISOString() },
+  { id: 'p6', taskId: '2', title: 'JS 알고리즘', content: '팩토리얼 함수로 재귀를 연습했다.', createdAt: new Date().toISOString() },
+  { id: 'p7', taskId: '5', title: '여행 어휘', content: '음식 주문에 필요한 새로운 표현을 배웠다.', createdAt: new Date().toISOString() },
 ];
 
 export const mockDailyRecords: DailyRecord = mockTasks.reduce((acc, task) => {
@@ -29,7 +29,7 @@ export const mockDailyRecords: DailyRecord = mockTasks.reduce((acc, task) => {
     
     // Check if a post exists for this task on this date
     const postExists = mockPosts.some(
-      (post) => post.taskId === task.id && format(post.createdAt, 'yyyy-MM-dd') === dateString
+      (post) => post.taskId === task.id && format(new Date(post.createdAt), 'yyyy-MM-dd') === dateString
     );
     
     if (postExists) {

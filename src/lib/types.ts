@@ -13,7 +13,7 @@ export type Post = {
   taskId: string;
   title: string;
   content: string;
-  createdAt: Date;
+  createdAt: string;
 };
 
 export type DailyStatus = 'O' | 'X' | ' ';
