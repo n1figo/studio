@@ -12,7 +12,6 @@ import {
 import { ko } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { mockTasks, mockDailyRecords } from '@/lib/mock-data';
@@ -65,7 +64,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle>{format(currentDate, 'yyyy년 MMMM', { locale: ko })}</CardTitle>
-              <CardDescription>모든 날짜를 보려면 가로로 스크롤하세요.</CardDescription>
+              <CardDescription>월별 진행 상황을 확인하세요.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={handlePrevMonth}>
@@ -110,7 +109,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Calendar Grid */}
-            <ScrollArea className="w-full h-full whitespace-nowrap">
+            <div className="w-full h-full overflow-x-auto">
               <div className="flex-grow h-full">
                 <div className="grid h-full" style={{ gridTemplateColumns: `repeat(${daysInMonth.length}, minmax(44px, 1fr))`, gridTemplateRows: `4rem repeat(${tasks.length}, 3rem)`}}>
                   {/* Header Row - Dates */}
@@ -156,8 +155,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </div>
-              <ScrollBar orientation="horizontal" />
-            </ScrollArea>
+            </div>
           </div>
         </CardContent>
       </Card>
