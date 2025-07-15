@@ -9,6 +9,7 @@ import {
   addMonths,
   subMonths,
 } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -43,15 +44,15 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Your daily progress at a glance.</p>
+        <h1 className="text-3xl font-bold tracking-tight">대시보드</h1>
+        <p className="text-muted-foreground">일일 진행 상황을 한눈에 파악하세요.</p>
       </header>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <CardTitle>{format(currentDate, 'MMMM yyyy')}</CardTitle>
-              <CardDescription>Horizontally scroll to see all days.</CardDescription>
+              <CardTitle>{format(currentDate, 'yyyy년 MMMM', { locale: ko })}</CardTitle>
+              <CardDescription>모든 날짜를 보려면 가로로 스크롤하세요.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={handlePrevMonth}>
@@ -68,10 +69,10 @@ export default function DashboardPage() {
             <div className="relative">
               <div className="grid gap-2" style={{ gridTemplateColumns: `150px repeat(${daysInMonth.length}, 40px)` }}>
                 {/* Header Row */}
-                <div className="sticky left-0 z-10 bg-card font-semibold flex items-end">Task</div>
+                <div className="sticky left-0 z-10 bg-card font-semibold flex items-end">태스크</div>
                 {daysInMonth.map((day) => (
                   <div key={day.toString()} className="flex flex-col items-center justify-end font-semibold">
-                    <span className="text-xs">{format(day, 'E')}</span>
+                    <span className="text-xs">{format(day, 'E', { locale: ko })}</span>
                     <span>{format(day, 'd')}</span>
                   </div>
                 ))}
@@ -88,7 +89,7 @@ export default function DashboardPage() {
                       {daysInMonth.map((day) => {
                         const dateString = format(day, 'yyyy-MM-dd');
                         const status = records[task.id]?.[dateString] || ' ';
-                        const statusLabel = status === 'O' ? 'Success' : status === 'X' ? 'Failed' : 'Pending';
+                        const statusLabel = status === 'O' ? '성공' : status === 'X' ? '실패' : '대기 중';
                         
                         return (
                           <TooltipProvider key={`${task.id}-${day.toString()}`} delayDuration={100}>
@@ -104,8 +105,8 @@ export default function DashboardPage() {
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p>{`${task.name} - ${format(day, 'MMM d')}`}</p>
-                                <p>Status: {statusLabel}</p>
+                                <p>{`${task.name} - ${format(day, 'MMM d일', { locale: ko })}`}</p>
+                                <p>상태: {statusLabel}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>

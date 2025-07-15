@@ -2,6 +2,7 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -25,7 +26,7 @@ export default function TaskBoardPage() {
   const task = useMemo(() => mockTasks.find(t => t.id === taskId), [taskId]);
   
   if (!task) {
-    return <div className="text-center">Task not found.</div>;
+    return <div className="text-center">태스크를 찾을 수 없습니다.</div>;
   }
 
   const handleSavePost = (newPost: Omit<Post, 'id' | 'taskId' | 'createdAt'>) => {
@@ -36,7 +37,7 @@ export default function TaskBoardPage() {
       createdAt: new Date(),
     };
     setPosts(prev => [post, ...prev]);
-    toast({ title: 'Post Created', description: 'Your progress has been logged.' });
+    toast({ title: '게시물 생성됨', description: '진행 상황이 기록되었습니다.' });
     setIsDialogOpen(false);
   };
   
@@ -58,7 +59,7 @@ export default function TaskBoardPage() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button>
-              <Plus className="mr-2 h-4 w-4" /> Add Post
+              <Plus className="mr-2 h-4 w-4" /> 게시물 추가
             </Button>
           </DialogTrigger>
           <PostFormDialog onSave={handleSavePost} />
@@ -73,7 +74,7 @@ export default function TaskBoardPage() {
             <Card key={post.id}>
               <CardHeader>
                 <CardTitle>{post.title}</CardTitle>
-                <CardDescription>{format(post.createdAt, 'MMMM d, yyyy - h:mm a')}</CardDescription>
+                <CardDescription>{format(post.createdAt, 'yyyy년 MMMM d일 - a h:mm', { locale: ko })}</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm">{post.content}</p>
@@ -83,14 +84,14 @@ export default function TaskBoardPage() {
         ) : (
           <Card className="text-center py-12">
             <CardHeader>
-              <CardTitle>No Posts Yet</CardTitle>
-              <CardDescription>Start logging your progress by creating your first post!</CardDescription>
+              <CardTitle>아직 게시물이 없습니다</CardTitle>
+              <CardDescription>첫 게시물을 작성하여 진행 상황을 기록해보세요!</CardDescription>
             </CardHeader>
             <CardContent>
                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button>
-                      <Plus className="mr-2 h-4 w-4" /> Create First Post
+                      <Plus className="mr-2 h-4 w-4" /> 첫 게시물 작성
                     </Button>
                   </DialogTrigger>
                   <PostFormDialog onSave={handleSavePost} />
@@ -117,19 +118,19 @@ function PostFormDialog({ onSave }: { onSave: (post: Omit<Post, 'id' | 'taskId'|
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Add a New Post</DialogTitle>
+        <DialogTitle>새 게시물 추가</DialogTitle>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="space-y-4 py-4">
         <div className="space-y-2">
-          <Label htmlFor="title">Title</Label>
-          <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g., Chapter 1 Notes" required />
+          <Label htmlFor="title">제목</Label>
+          <Input id="title" value={title} onChange={e => setTitle(e.target.value)} placeholder="예: 1장 노트" required />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="content">Content</Label>
-          <Textarea id="content" value={content} onChange={e => setContent(e.target.value)} placeholder="Describe your achievement..." required />
+          <Label htmlFor="content">내용</Label>
+          <Textarea id="content" value={content} onChange={e => setContent(e.target.value)} placeholder="달성한 내용에 대해 설명해주세요..." required />
         </div>
         <div className="flex justify-end pt-4">
-          <Button type="submit">Save Post</Button>
+          <Button type="submit">게시물 저장</Button>
         </div>
       </form>
     </DialogContent>

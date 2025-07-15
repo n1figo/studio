@@ -38,19 +38,19 @@ export default function ManageTasksPage() {
 
   const handleDelete = (taskId: string) => {
     setTasks(tasks.filter((task) => task.id !== taskId));
-    toast({ title: 'Task Deleted', description: 'The task has been successfully removed.' });
+    toast({ title: '태스크 삭제됨', description: '태스크가 성공적으로 삭제되었습니다.' });
   };
   
   const handleSave = (taskData: Omit<Task, 'id'> & { id?: string }) => {
     if (taskData.id) {
       // Edit existing task
       setTasks(tasks.map(t => t.id === taskData.id ? { ...t, ...taskData } : t));
-      toast({ title: 'Task Updated', description: 'Your task has been saved.' });
+      toast({ title: '태스크 업데이트됨', description: '태스크가 저장되었습니다.' });
     } else {
       // Add new task
       const newTask = { ...taskData, id: new Date().toISOString() };
       setTasks([...tasks, newTask]);
-      toast({ title: 'Task Created', description: 'Your new task is ready.' });
+      toast({ title: '태스크 생성됨', description: '새로운 태스크가 준비되었습니다.' });
     }
     setIsDialogOpen(false);
     setEditingTask(null);
@@ -60,13 +60,13 @@ export default function ManageTasksPage() {
     <div className="space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Manage Tasks</h1>
-          <p className="text-muted-foreground">Create, edit, and organize your custom tasks.</p>
+          <h1 className="text-3xl font-bold tracking-tight">태스크 관리</h1>
+          <p className="text-muted-foreground">사용자 지정 태스크를 생성, 편집 및 구성하세요.</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button onClick={handleAddNew}>
-              <Plus className="mr-2 h-4 w-4" /> Add New Task
+              <Plus className="mr-2 h-4 w-4" /> 새 태스크 추가
             </Button>
           </DialogTrigger>
           <TaskFormDialog
@@ -88,7 +88,7 @@ export default function ManageTasksPage() {
                 </span>
                 <div className="flex-1">
                   <CardTitle>{task.name}</CardTitle>
-                  <CardDescription className="line-clamp-2">{task.description || 'No description'}</CardDescription>
+                  <CardDescription className="line-clamp-2">{task.description || '설명 없음'}</CardDescription>
                 </div>
               </CardHeader>
               <CardFooter className="mt-auto flex justify-end gap-2">
@@ -132,24 +132,24 @@ function TaskFormDialog({
   return (
     <DialogContent className="sm:max-w-2xl">
       <DialogHeader>
-        <DialogTitle>{task ? 'Edit Task' : 'Add New Task'}</DialogTitle>
+        <DialogTitle>{task ? '태스크 편집' : '새 태스크 추가'}</DialogTitle>
         <DialogDescription>
-          {task ? 'Update the details of your task.' : 'Create a new task to track your progress.'}
+          {task ? '태스크의 세부 정보를 업데이트하세요.' : '진행 상황을 추적할 새 태스크를 만드세요.'}
         </DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
         <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Task Name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Daily Workout" required />
+              <Label htmlFor="name">태스크 이름</Label>
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 매일 운동하기" required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe your task..." />
+              <Label htmlFor="description">설명</Label>
+              <Textarea id="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="태스크에 대해 설명해주세요..." />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="icon">Icon</Label>
+                <Label htmlFor="icon">아이콘</Label>
                 <Select value={icon} onValueChange={setIcon}>
                   <SelectTrigger id="icon">
                     <div className="flex items-center gap-2">
@@ -173,7 +173,7 @@ function TaskFormDialog({
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="color">Color</Label>
+                <Label htmlFor="color">색상</Label>
                 <div className="grid grid-cols-4 gap-2">
                   {colorPresets.map((preset) => (
                     <Button
@@ -196,11 +196,10 @@ function TaskFormDialog({
       </form>
       <DialogFooter>
         <DialogClose asChild>
-          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="outline" onClick={onClose}>취소</Button>
         </DialogClose>
-        <Button type="submit" onClick={handleSubmit}>Save Task</Button>
+        <Button type="submit" onClick={handleSubmit}>태스크 저장</Button>
       </DialogFooter>
     </DialogContent>
   );
 }
-
