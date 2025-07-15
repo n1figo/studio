@@ -181,7 +181,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarFooter>
         </Sidebar>
-        <div className="flex flex-1 flex-col">
+        <div className="flex-1 flex flex-col w-0">
           <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-card px-6 sticky top-0 z-30">
              <div className="flex-1">
                  <SidebarTrigger className="md:hidden" />
