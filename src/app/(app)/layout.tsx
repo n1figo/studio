@@ -10,7 +10,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
-  SidebarInset,
   SidebarTrigger,
   SidebarMenuAction,
 } from '@/components/ui/sidebar';
@@ -79,8 +78,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen">
-        <Sidebar variant="sidebar" collapsible="icon">
+      <div className="flex min-h-screen bg-muted/40">
+        <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-2">
               <Link href="/dashboard" className="flex items-center gap-2">
@@ -94,7 +93,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <Link href="/dashboard" legacyBehavior passHref>
+                <Link href="/dashboard">
                   <SidebarMenuButton tooltip="대시보드" isActive={pathname === '/dashboard'}>
                     <Home />
                     <span>대시보드</span>
@@ -102,7 +101,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Link>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <Link href="/manage-tasks" legacyBehavior passHref>
+                <Link href="/manage-tasks">
                   <SidebarMenuButton tooltip="태스크 관리" isActive={pathname === '/manage-tasks'}>
                     <Settings />
                     <span>태스크 관리</span>
@@ -111,7 +110,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarMenuItem>
             </SidebarMenu>
 
-            <div className="mt-4 px-2 text-sm font-semibold text-muted-foreground group-data-[collapsible=icon]:hidden">
+            <div className="mt-4 px-2 text-sm font-semibold text-muted-foreground group-data-[collapsed=true]:hidden">
               내 태스크
             </div>
             <SidebarMenu>
@@ -139,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         </Button>
                       </div>
                     ) : (
-                      <Link href={`/tasks/${task.id}`} legacyBehavior passHref>
+                      <Link href={`/tasks/${task.id}`}>
                         <SidebarMenuButton tooltip={task.name} isActive={pathname === `/tasks/${task.id}`}>
                           <Icon style={{ color: task.color }} />
                           <span>{task.name}</span>
@@ -160,7 +159,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 );
               })}
               <SidebarMenuItem>
-                <Link href="/manage-tasks" legacyBehavior passHref>
+                <Link href="/manage-tasks">
                   <SidebarMenuButton variant="outline">
                     <Plus />
                     <span>새 태스크</span>
@@ -175,18 +174,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <AvatarImage src="https://placehold.co/40x40" alt="사용자 아바타" data-ai-hint="user avatar" />
                 <AvatarFallback>U</AvatarFallback>
               </Avatar>
-              <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+              <div className="flex flex-col group-data-[collapsed=true]:hidden">
                 <span className="font-semibold text-sm">사용자</span>
                 <span className="text-xs text-muted-foreground">user@taskforge.com</span>
               </div>
             </div>
           </SidebarFooter>
         </Sidebar>
-        <div className="flex flex-1">
+        <div className="flex-1 flex flex-col">
+          <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-card px-6 sticky top-0 z-30">
+             <div className="flex-1">
+                 <SidebarTrigger className="md:hidden" />
+             </div>
+          </header>
           <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
-            <header className="flex items-center justify-end md:hidden mb-4">
-              <SidebarTrigger />
-            </header>
             {children}
           </main>
         </div>
