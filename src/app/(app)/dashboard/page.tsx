@@ -1,6 +1,6 @@
-'use client';
 
-import { useState, useMemo } from 'react';
+'use client';
+import React, { useState, useMemo } from 'react';
 import {
   startOfMonth,
   endOfMonth,
@@ -42,17 +42,17 @@ export default function DashboardPage() {
   const handleNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1));
 
   return (
-    <div className="space-y-6">
-      <header>
+    <div className="flex flex-col h-full">
+      <header className="pb-4">
         <h1 className="text-3xl font-bold tracking-tight">대시보드</h1>
         <p className="text-muted-foreground">일일 진행 상황을 한눈에 파악하세요.</p>
       </header>
-      <Card>
+      <Card className="flex-grow flex flex-col">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle>{format(currentDate, 'yyyy년 MMMM', { locale: ko })}</CardTitle>
-              <CardDescription>모든 태스크를 보려면 가로로 스크롤하세요.</CardDescription>
+              <CardDescription>모든 날짜를 보려면 가로로 스크롤하세요.</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={handlePrevMonth}>
@@ -64,30 +64,31 @@ export default function DashboardPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <ScrollArea className="w-full whitespace-nowrap">
-            <div className="relative">
-              <div className="grid gap-2" style={{ gridTemplateColumns: `80px repeat(${tasks.length}, 1fr)`}}>
-                {/* Header Row - Tasks */}
-                <div className="sticky left-0 z-10 bg-card font-semibold flex items-end">날짜</div>
+        <CardContent className="flex-grow overflow-hidden">
+          <ScrollArea className="w-full h-full whitespace-nowrap">
+             <div className="relative h-full">
+              <div className="grid gap-2 h-full" style={{ gridTemplateColumns: `minmax(120px, 1.5fr) repeat(${daysInMonth.length}, 1fr)`}}>
+                {/* Header Row - Dates */}
+                <div className="sticky left-0 z-10 bg-card font-semibold flex items-end">태스크</div>
+                {daysInMonth.map((day) => (
+                  <div key={day.toString()} className="flex flex-col items-center justify-end font-semibold text-center gap-1 pb-1">
+                    <span className="text-xs text-muted-foreground">{format(day, 'E', { locale: ko })}</span>
+                    <span className="font-semibold">{format(day, 'd일')}</span>
+                  </div>
+                ))}
+
+                {/* Task Rows */}
                 {tasks.map((task) => {
                   const Icon = getIcon(task.icon);
                   return (
-                    <div key={task.id} className="flex flex-col items-center justify-end font-semibold text-center gap-1 pb-1">
-                      <Icon className="w-5 h-5" style={{ color: task.color }} />
-                      <span className="text-xs truncate w-full">{task.name}</span>
+                  <React.Fragment key={task.id}>
+                    <div className="sticky left-0 z-10 bg-card flex items-center gap-2 text-sm font-medium py-2 pr-2">
+                       <div className="p-1.5 rounded-md" style={{ backgroundColor: `${task.color}20`}}>
+                        <Icon className="w-5 h-5" style={{ color: task.color }} />
+                       </div>
+                       <span className="truncate">{task.name}</span>
                     </div>
-                  );
-                })}
-
-                {/* Date Rows */}
-                {daysInMonth.map((day) => (
-                  <>
-                    <div key={day.toString()} className="sticky left-0 z-10 bg-card flex items-center gap-2 text-sm font-medium py-2 pr-2">
-                       <span className="font-semibold">{format(day, 'd일')}</span>
-                       <span className="text-xs text-muted-foreground">{format(day, 'E', { locale: ko })}</span>
-                    </div>
-                    {tasks.map((task) => {
+                    {daysInMonth.map((day) => {
                       const dateString = format(day, 'yyyy-MM-dd');
                       const status = records[task.id]?.[dateString] || ' ';
                       const statusLabel = status === 'O' ? '성공' : status === 'X' ? '실패' : '대기 중';
@@ -115,8 +116,8 @@ export default function DashboardPage() {
                         </TooltipProvider>
                       );
                     })}
-                  </>
-                ))}
+                  </React.Fragment>
+                )})}
               </div>
             </div>
             <ScrollBar orientation="horizontal" />

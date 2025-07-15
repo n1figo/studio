@@ -79,8 +79,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen">
-        <Sidebar variant="inset" collapsible="icon">
+      <div className="flex min-h-screen">
+        <Sidebar variant="sidebar" collapsible="icon">
           <SidebarHeader>
             <div className="flex items-center gap-2">
               <Link href="/dashboard" className="flex items-center gap-2">
@@ -182,20 +182,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </SidebarFooter>
         </Sidebar>
-        <SidebarInset>
-          <div className="p-4 sm:p-6 lg:p-8">
-            <header className="flex items-center justify-between md:hidden mb-4">
-               <div className="flex items-center gap-2">
-                 <div className="p-1.5 bg-primary/20 rounded-lg">
-                    <Star className="text-primary h-5 w-5" />
-                  </div>
-                 <h1 className="text-lg font-semibold">태스크 포지</h1>
-               </div>
+        <div className="flex flex-1">
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+            <header className="flex items-center justify-end md:hidden mb-4">
               <SidebarTrigger />
             </header>
             {children}
-          </div>
-        </SidebarInset>
+          </main>
+        </div>
       </div>
     </SidebarProvider>
   );
