@@ -64,60 +64,70 @@ export default function DashboardPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="flex-grow overflow-hidden">
+        <CardContent className="flex-grow flex flex-col overflow-hidden">
           <ScrollArea className="w-full h-full whitespace-nowrap">
-             <div className="relative h-full">
-              <div className="grid gap-2 h-full" style={{ gridTemplateColumns: `minmax(120px, 1.5fr) repeat(${daysInMonth.length}, 1fr)`}}>
-                {/* Header Row - Dates */}
-                <div className="sticky left-0 z-10 bg-card font-semibold flex items-end">태스크</div>
-                {daysInMonth.map((day) => (
-                  <div key={day.toString()} className="flex flex-col items-center justify-end font-semibold text-center gap-1 pb-1">
-                    <span className="text-xs text-muted-foreground">{format(day, 'E', { locale: ko })}</span>
-                    <span className="font-semibold">{format(day, 'd일')}</span>
-                  </div>
-                ))}
-
-                {/* Task Rows */}
+            <div className="flex h-full">
+              {/* Task Names Column */}
+              <div className="sticky left-0 bg-card z-20 pr-4 border-r">
+                <div className="h-16 flex items-end pb-1 font-semibold">태스크</div>
                 {tasks.map((task) => {
                   const Icon = getIcon(task.icon);
                   return (
-                  <React.Fragment key={task.id}>
-                    <div className="sticky left-0 z-10 bg-card flex items-center gap-2 text-sm font-medium py-2 pr-2">
+                    <div key={task.id} className="h-12 flex items-center gap-2 text-sm font-medium pr-2">
                        <div className="p-1.5 rounded-md" style={{ backgroundColor: `${task.color}20`}}>
                         <Icon className="w-5 h-5" style={{ color: task.color }} />
                        </div>
-                       <span className="truncate">{task.name}</span>
+                       <span className="truncate w-24">{task.name}</span>
                     </div>
-                    {daysInMonth.map((day) => {
-                      const dateString = format(day, 'yyyy-MM-dd');
-                      const status = records[task.id]?.[dateString] || ' ';
-                      const statusLabel = status === 'O' ? '성공' : status === 'X' ? '실패' : '대기 중';
+                  );
+                })}
+              </div>
 
-                      return (
-                        <TooltipProvider key={`${task.id}-${day.toString()}`} delayDuration={100}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex justify-center">
-                                <div
-                                  className={cn(
-                                    'w-10 h-10 rounded-md flex items-center justify-center font-bold text-lg',
-                                    statusStyles[status]
-                                  )}
-                                >
-                                  {status !== ' ' && status}
+              {/* Calendar Grid */}
+              <div className="flex-grow">
+                <div className="grid h-full" style={{ gridTemplateColumns: `repeat(${daysInMonth.length}, minmax(44px, 1fr))`, gridTemplateRows: `4rem repeat(${tasks.length}, 3rem)`}}>
+                  {/* Header Row - Dates */}
+                  {daysInMonth.map((day) => (
+                    <div key={day.toString()} className="flex flex-col items-center justify-end font-semibold text-center gap-1 pb-1">
+                      <span className="text-xs text-muted-foreground">{format(day, 'E', { locale: ko })}</span>
+                      <span className="font-semibold">{format(day, 'd일')}</span>
+                    </div>
+                  ))}
+
+                  {/* Task Rows */}
+                  {tasks.map((task) => (
+                    <React.Fragment key={task.id}>
+                      {daysInMonth.map((day) => {
+                        const dateString = format(day, 'yyyy-MM-dd');
+                        const status = records[task.id]?.[dateString] || ' ';
+                        const statusLabel = status === 'O' ? '성공' : status === 'X' ? '실패' : '대기 중';
+
+                        return (
+                          <TooltipProvider key={`${task.id}-${day.toString()}`} delayDuration={100}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex justify-center items-center">
+                                  <div
+                                    className={cn(
+                                      'w-10 h-10 rounded-md flex items-center justify-center font-bold text-lg',
+                                      statusStyles[status]
+                                    )}
+                                  >
+                                    {status !== ' ' && status}
+                                  </div>
                                 </div>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{`${task.name} - ${format(day, 'MMM d일', { locale: ko })}`}</p>
-                              <p>상태: {statusLabel}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      );
-                    })}
-                  </React.Fragment>
-                )})}
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{`${task.name} - ${format(day, 'MMM d일', { locale: ko })}`}</p>
+                                <p>상태: {statusLabel}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+                </div>
               </div>
             </div>
             <ScrollBar orientation="horizontal" />
