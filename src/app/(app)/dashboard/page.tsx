@@ -1,6 +1,6 @@
 
 'use client';
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   startOfMonth,
   endOfMonth,
@@ -14,10 +14,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { mockTasks, mockDailyRecords } from '@/lib/mock-data';
+import { mockTasks, mockPosts as fallbackPosts } from '@/lib/mock-data';
 import { getIcon } from '@/lib/icons';
 import { cn } from '@/lib/utils';
-import type { DailyStatus } from '@/lib/types';
+import type { DailyStatus, DailyRecord, Post } from '@/lib/types';
+
+const POSTS_STORAGE_KEY = 'taskforge-posts';
 
 const statusStyles: { [key in DailyStatus]: string } = {
   'O': 'bg-green-300 dark:bg-green-800 text-green-900 dark:text-green-200',
@@ -25,8 +27,66 @@ const statusStyles: { [key in DailyStatus]: string } = {
   ' ': 'bg-muted/50',
 };
 
+const generateDailyRecords = (tasks: typeof mockTasks, posts: Post[]): DailyRecord => {
+  return tasks.reduce((acc, task) => {
+    acc[task.id] = {};
+    for (let i = 0; i < 31; i++) { // Generate for the last 31 days for context
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateString = format(date, 'yyyy-MM-dd');
+      
+      const postExists = posts.some(
+        (post) => post.taskId === task.id && format(new Date(post.createdAt), 'yyyy-MM-dd') === dateString
+      );
+      
+      if (postExists) {
+        acc[task.id][dateString] = 'O';
+      } else if (date < new Date(new Date().setHours(0,0,0,0))) { // Mark past days without posts as 'X'
+        acc[task.id][dateString] = 'X';
+      } else {
+        acc[task.id][dateString] = ' ';
+      }
+    }
+    return acc;
+  }, {} as DailyRecord);
+};
+
+
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [records, setRecords] = useState<DailyRecord>({});
+
+  useEffect(() => {
+    let storedPosts: Post[];
+    try {
+      const storedPostsRaw = localStorage.getItem(POSTS_STORAGE_KEY);
+      if (storedPostsRaw) {
+        storedPosts = JSON.parse(storedPostsRaw);
+      } else {
+        storedPosts = fallbackPosts;
+        localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(fallbackPosts));
+      }
+    } catch (error) {
+      console.error("Failed to access localStorage", error);
+      storedPosts = fallbackPosts;
+    }
+    const dynamicRecords = generateDailyRecords(mockTasks, storedPosts);
+    setRecords(dynamicRecords);
+
+    // Listen for storage changes to update the dashboard
+    const handleStorageChange = (event: StorageEvent) => {
+        if (event.key === POSTS_STORAGE_KEY && event.newValue) {
+             const updatedPosts = JSON.parse(event.newValue);
+             const updatedRecords = generateDailyRecords(mockTasks, updatedPosts);
+             setRecords(updatedRecords);
+        }
+    }
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+    }
+  }, []);
 
   const daysInMonth = useMemo(() => {
     const start = startOfMonth(currentDate);
@@ -35,7 +95,6 @@ export default function DashboardPage() {
   }, [currentDate]);
 
   const tasks = mockTasks;
-  const records = mockDailyRecords;
 
   const handlePrevMonth = () => setCurrentDate((prev) => subMonths(prev, 1));
   const handleNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1));

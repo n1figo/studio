@@ -19,26 +19,3 @@ export const mockPosts: Post[] = [
   { id: 'p6', taskId: '2', title: 'JS 알고리즘', content: '팩토리얼 함수로 재귀를 연습했다.', createdAt: new Date().toISOString() },
   { id: 'p7', taskId: '5', title: '여행 어휘', content: '음식 주문에 필요한 새로운 표현을 배웠다.', createdAt: new Date().toISOString() },
 ];
-
-export const mockDailyRecords: DailyRecord = mockTasks.reduce((acc, task) => {
-  acc[task.id] = {};
-  for (let i = 0; i < 31; i++) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateString = format(date, 'yyyy-MM-dd');
-    
-    // Check if a post exists for this task on this date
-    const postExists = mockPosts.some(
-      (post) => post.taskId === task.id && format(new Date(post.createdAt), 'yyyy-MM-dd') === dateString
-    );
-    
-    if (postExists) {
-      acc[task.id][dateString] = 'O';
-    } else if (date < new Date(new Date().setHours(0,0,0,0))) { // Mark past days without posts as 'X'
-      acc[task.id][dateString] = 'X';
-    } else {
-      acc[task.id][dateString] = ' ';
-    }
-  }
-  return acc;
-}, {} as DailyRecord);
