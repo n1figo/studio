@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -41,6 +41,14 @@ export default function TaskBoardPage() {
     setIsDialogOpen(false);
   };
   
+  const handleDeletePost = (postId: string) => {
+    setPosts(posts.filter((post) => post.id !== postId));
+    toast({
+      title: '게시물 삭제됨',
+      description: '게시물이 성공적으로 삭제되었습니다.',
+    });
+  };
+
   const Icon = getIcon(task.icon);
 
   return (
@@ -73,8 +81,15 @@ export default function TaskBoardPage() {
           .map((post) => (
             <Card key={post.id}>
               <CardHeader>
-                <CardTitle>{post.title}</CardTitle>
-                <CardDescription>{format(post.createdAt, 'yyyy년 MMMM d일 - a h:mm', { locale: ko })}</CardDescription>
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <CardTitle>{post.title}</CardTitle>
+                    <CardDescription>{format(post.createdAt, 'yyyy년 MMMM d일 - a h:mm', { locale: ko })}</CardDescription>
+                  </div>
+                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => handleDeletePost(post.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-sm">{post.content}</p>
