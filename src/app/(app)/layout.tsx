@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import {
@@ -79,7 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider>
       <div className="min-h-screen">
-        <Sidebar>
+        <Sidebar variant="inset" collapsible="icon">
           <SidebarHeader>
             <div className="flex items-center gap-2">
               <Link href="/dashboard" className="flex items-center gap-2">
