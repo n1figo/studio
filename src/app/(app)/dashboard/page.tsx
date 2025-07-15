@@ -41,6 +41,19 @@ export default function DashboardPage() {
   const handlePrevMonth = () => setCurrentDate((prev) => subMonths(prev, 1));
   const handleNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1));
 
+  const subtotalForAllTasks = useMemo(() => {
+    return tasks.map(task => {
+        const taskRecords = records[task.id] || {};
+        return daysInMonth.reduce((acc, day) => {
+            const dateString = format(day, 'yyyy-MM-dd');
+            if (taskRecords[dateString] === 'O') {
+                return acc + 1;
+            }
+            return acc;
+        }, 0);
+    });
+  }, [tasks, records, daysInMonth]);
+
   return (
     <div className="flex flex-col h-full">
       <header className="pb-4">
@@ -67,20 +80,32 @@ export default function DashboardPage() {
         <CardContent className="flex-grow flex flex-col overflow-hidden">
           <ScrollArea className="w-full h-full whitespace-nowrap">
             <div className="flex h-full">
-              {/* Task Names Column */}
-              <div className="sticky left-0 bg-card z-20 pr-4 border-r">
-                <div className="h-16 flex items-end pb-1 font-semibold">태스크</div>
-                {tasks.map((task) => {
-                  const Icon = getIcon(task.icon);
-                  return (
-                    <div key={task.id} className="h-12 flex items-center gap-2 text-sm font-medium pr-2">
-                       <div className="p-1.5 rounded-md" style={{ backgroundColor: `${task.color}20`}}>
-                        <Icon className="w-5 h-5" style={{ color: task.color }} />
-                       </div>
-                       <span className="truncate w-24">{task.name}</span>
-                    </div>
-                  );
-                })}
+              {/* Task Names and Subtotal Column */}
+              <div className="sticky left-0 bg-card z-20 flex border-r">
+                 {/* Task Names Column */}
+                <div className="pr-4">
+                  <div className="h-16 flex items-end pb-1 font-semibold">태스크</div>
+                  {tasks.map((task) => {
+                    const Icon = getIcon(task.icon);
+                    return (
+                      <div key={task.id} className="h-12 flex items-center gap-2 text-sm font-medium pr-2">
+                         <div className="p-1.5 rounded-md" style={{ backgroundColor: `${task.color}20`}}>
+                          <Icon className="w-5 h-5" style={{ color: task.color }} />
+                         </div>
+                         <span className="truncate w-24">{task.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                 {/* Subtotal Column */}
+                <div className="pr-4 border-l">
+                    <div className="h-16 flex items-end justify-center pb-1 font-semibold">소계</div>
+                    {tasks.map((task, index) => (
+                        <div key={task.id} className="h-12 flex items-center justify-center text-sm font-bold">
+                            {subtotalForAllTasks[index]}
+                        </div>
+                    ))}
+                </div>
               </div>
 
               {/* Calendar Grid */}
