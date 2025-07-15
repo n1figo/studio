@@ -6,17 +6,18 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { mockTasks, mockPosts } from '@/lib/mock-data';
-import type { Post } from '@/lib/types';
+import { mockTasks as fallbackTasks, mockPosts as fallbackPosts } from '@/lib/mock-data';
+import type { Post, Task } from '@/lib/types';
 import { getIcon } from '@/lib/icons';
 
 const POSTS_STORAGE_KEY = 'taskforge-posts';
+const TASKS_STORAGE_KEY = 'taskforge-tasks';
 
 export default function TaskBoardPage() {
   const params = useParams();
@@ -24,21 +25,34 @@ export default function TaskBoardPage() {
   const { toast } = useToast();
 
   const [posts, setPosts] = useState<Post[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   useEffect(() => {
     try {
       const storedPosts = localStorage.getItem(POSTS_STORAGE_KEY);
-      if (storedPosts) {
-        setPosts(JSON.parse(storedPosts));
-      } else {
-        localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(mockPosts));
-        setPosts(mockPosts);
-      }
+      setPosts(storedPosts ? JSON.parse(storedPosts) : fallbackPosts);
+
+      const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
+      setTasks(storedTasks ? JSON.parse(storedTasks) : fallbackTasks);
     } catch (error) {
       console.error("Failed to access localStorage", error);
-      setPosts(mockPosts);
+      setPosts(fallbackPosts);
+      setTasks(fallbackTasks);
     }
+    
+    // Listen for storage changes to update tasks
+    const handleStorageChange = (event: StorageEvent) => {
+        if (event.key === TASKS_STORAGE_KEY && event.newValue) {
+             setTasks(JSON.parse(event.newValue));
+        }
+    }
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+    }
+
   }, []);
 
   const taskPosts = useMemo(() => {
@@ -46,7 +60,7 @@ export default function TaskBoardPage() {
       .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [posts, taskId]);
 
-  const task = useMemo(() => mockTasks.find(t => t.id === taskId), [taskId]);
+  const task = useMemo(() => tasks.find(t => t.id === taskId), [tasks, taskId]);
   
   if (!task) {
     return <div className="text-center">태스크를 찾을 수 없습니다.</div>;

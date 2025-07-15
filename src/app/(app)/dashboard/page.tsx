@@ -14,12 +14,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { mockTasks, mockPosts as fallbackPosts } from '@/lib/mock-data';
+import { mockTasks as fallbackTasks, mockPosts as fallbackPosts } from '@/lib/mock-data';
 import { getIcon } from '@/lib/icons';
 import { cn } from '@/lib/utils';
-import type { DailyStatus, DailyRecord, Post } from '@/lib/types';
+import type { DailyStatus, DailyRecord, Post, Task } from '@/lib/types';
 
 const POSTS_STORAGE_KEY = 'taskforge-posts';
+const TASKS_STORAGE_KEY = 'taskforge-tasks';
 
 const statusStyles: { [key in DailyStatus]: string } = {
   'O': 'bg-green-300 dark:bg-green-800 text-green-900 dark:text-green-200',
@@ -27,7 +28,7 @@ const statusStyles: { [key in DailyStatus]: string } = {
   ' ': 'bg-muted/50',
 };
 
-const generateDailyRecords = (tasks: typeof mockTasks, posts: Post[]): DailyRecord => {
+const generateDailyRecords = (tasks: Task[], posts: Post[]): DailyRecord => {
   return tasks.reduce((acc, task) => {
     acc[task.id] = {};
     for (let i = 0; i < 31; i++) { // Generate for the last 31 days for context
@@ -55,30 +56,40 @@ const generateDailyRecords = (tasks: typeof mockTasks, posts: Post[]): DailyReco
 export default function DashboardPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [records, setRecords] = useState<DailyRecord>({});
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
 
-  useEffect(() => {
+  const loadData = () => {
     let storedPosts: Post[];
+    let storedTasks: Task[];
     try {
       const storedPostsRaw = localStorage.getItem(POSTS_STORAGE_KEY);
-      if (storedPostsRaw) {
-        storedPosts = JSON.parse(storedPostsRaw);
-      } else {
-        storedPosts = fallbackPosts;
-        localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(fallbackPosts));
-      }
+      storedPosts = storedPostsRaw ? JSON.parse(storedPostsRaw) : fallbackPosts;
+      setPosts(storedPosts);
+
+      const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
+      storedTasks = storedTasksRaw ? JSON.parse(storedTasksRaw) : fallbackTasks;
+      setTasks(storedTasks);
+      
+      const dynamicRecords = generateDailyRecords(storedTasks, storedPosts);
+      setRecords(dynamicRecords);
+
     } catch (error) {
       console.error("Failed to access localStorage", error);
-      storedPosts = fallbackPosts;
+      setPosts(fallbackPosts);
+      setTasks(fallbackTasks);
+      const dynamicRecords = generateDailyRecords(fallbackTasks, fallbackPosts);
+      setRecords(dynamicRecords);
     }
-    const dynamicRecords = generateDailyRecords(mockTasks, storedPosts);
-    setRecords(dynamicRecords);
+  };
+
+  useEffect(() => {
+    loadData();
 
     // Listen for storage changes to update the dashboard
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === POSTS_STORAGE_KEY && event.newValue) {
-             const updatedPosts = JSON.parse(event.newValue);
-             const updatedRecords = generateDailyRecords(mockTasks, updatedPosts);
-             setRecords(updatedRecords);
+        if (event.key === POSTS_STORAGE_KEY || event.key === TASKS_STORAGE_KEY) {
+             loadData();
         }
     }
     window.addEventListener('storage', handleStorageChange);
@@ -93,8 +104,6 @@ export default function DashboardPage() {
     const end = endOfMonth(currentDate);
     return eachDayOfInterval({ start, end });
   }, [currentDate]);
-
-  const tasks = mockTasks;
 
   const handlePrevMonth = () => setCurrentDate((prev) => subMonths(prev, 1));
   const handleNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1));

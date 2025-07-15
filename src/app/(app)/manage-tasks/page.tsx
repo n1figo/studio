@@ -1,6 +1,7 @@
+
 'use client';
-import { useState } from 'react';
-import { Plus, Trash2, Edit, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -9,10 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { mockTasks } from '@/lib/mock-data';
+import { mockTasks as fallbackTasks } from '@/lib/mock-data';
 import { getIcon, iconList } from '@/lib/icons';
 import type { Task } from '@/lib/types';
 import { AiProjectDiscoverer } from '@/components/ai-project-discoverer';
+
+const TASKS_STORAGE_KEY = 'taskforge-tasks';
 
 const colorPresets = [
   'hsl(347, 89%, 60%)', 'hsl(210, 89%, 60%)', 'hsl(110, 89%, 60%)',
@@ -21,10 +24,39 @@ const colorPresets = [
 ];
 
 export default function ManageTasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { toast } = useToast();
+  
+  const loadTasks = () => {
+     try {
+        const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
+        if (storedTasksRaw) {
+            setTasks(JSON.parse(storedTasksRaw));
+        } else {
+            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
+            setTasks(fallbackTasks);
+        }
+    } catch (error) {
+        console.error("Failed to access localStorage", error);
+        setTasks(fallbackTasks);
+    }
+  }
+
+  useEffect(() => {
+    loadTasks();
+    
+    const handleStorageChange = (event: StorageEvent) => {
+        if (event.key === TASKS_STORAGE_KEY && event.newValue) {
+            setTasks(JSON.parse(event.newValue));
+        }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   const handleEdit = (task: Task) => {
     setEditingTask(task);
@@ -36,22 +68,35 @@ export default function ManageTasksPage() {
     setIsDialogOpen(true);
   };
 
+  const updateLocalStorage = (updatedTasks: Task[]) => {
+    try {
+        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(updatedTasks));
+    } catch (error) {
+        console.error("Failed to save to localStorage", error);
+    }
+  }
+
   const handleDelete = (taskId: string) => {
-    setTasks(tasks.filter((task) => task.id !== taskId));
+    const updatedTasks = tasks.filter((task) => task.id !== taskId);
+    setTasks(updatedTasks);
+    updateLocalStorage(updatedTasks);
     toast({ title: '태스크 삭제됨', description: '태스크가 성공적으로 삭제되었습니다.' });
   };
   
   const handleSave = (taskData: Omit<Task, 'id'> & { id?: string }) => {
+    let updatedTasks;
     if (taskData.id) {
       // Edit existing task
-      setTasks(tasks.map(t => t.id === taskData.id ? { ...t, ...taskData } : t));
+      updatedTasks = tasks.map(t => t.id === taskData.id ? { ...t, ...taskData } : t);
       toast({ title: '태스크 업데이트됨', description: '태스크가 저장되었습니다.' });
     } else {
       // Add new task
       const newTask = { ...taskData, id: new Date().toISOString() };
-      setTasks([...tasks, newTask]);
+      updatedTasks = [...tasks, newTask];
       toast({ title: '태스크 생성됨', description: '새로운 태스크가 준비되었습니다.' });
     }
+    setTasks(updatedTasks);
+    updateLocalStorage(updatedTasks);
     setIsDialogOpen(false);
     setEditingTask(null);
   };

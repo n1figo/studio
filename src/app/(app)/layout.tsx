@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Home, Settings, Plus, Star, Pencil, Check, X } from 'lucide-react';
-import { mockTasks } from '@/lib/mock-data';
+import { mockTasks as fallbackTasks } from '@/lib/mock-data';
 import { getIcon } from '@/lib/icons';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePathname } from 'next/navigation';
@@ -26,15 +26,47 @@ import { useToast } from '@/hooks/use-toast';
 import type { Task } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+const TASKS_STORAGE_KEY = 'taskforge-tasks';
+
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
-  // In a real app, this data would come from an API call
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskName, setEditingTaskName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
   const { state: sidebarState } = useSidebar();
+
+  const loadTasks = () => {
+    try {
+        const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
+        if (storedTasksRaw) {
+            setTasks(JSON.parse(storedTasksRaw));
+        } else {
+            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
+            setTasks(fallbackTasks);
+        }
+    } catch (error) {
+        console.error("Failed to access localStorage", error);
+        setTasks(fallbackTasks);
+    }
+  }
+
+  useEffect(() => {
+    loadTasks();
+    
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === TASKS_STORAGE_KEY && event.newValue) {
+        setTasks(JSON.parse(event.newValue));
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (editingTaskId && inputRef.current) {
@@ -61,7 +93,14 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    setTasks(tasks.map(t => t.id === editingTaskId ? { ...t, name: editingTaskName } : t));
+    const updatedTasks = tasks.map(t => t.id === editingTaskId ? { ...t, name: editingTaskName } : t);
+    setTasks(updatedTasks);
+    try {
+        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(updatedTasks));
+    } catch (error) {
+        console.error("Failed to save to localStorage", error);
+    }
+
     toast({
         title: '태스크 업데이트됨',
         description: '태스크 이름이 성공적으로 저장되었습니다.',
