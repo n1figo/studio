@@ -25,6 +25,8 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import type { Task } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { SupabaseProvider } from '@/components/supabase-provider';
+import { saveTasks, loadTasksFromSupabase } from '@/hooks/use-supabase-sync';
 
 const TASKS_STORAGE_KEY = 'taskforge-tasks';
 
@@ -37,18 +39,29 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const { state: sidebarState } = useSidebar();
 
-  const loadTasks = () => {
+  const loadTasks = async () => {
     try {
-        const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
-        if (storedTasksRaw) {
-            setTasks(JSON.parse(storedTasksRaw));
-        } else {
-            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-            setTasks(fallbackTasks);
+      // Try to load from Supabase first
+      if (navigator.onLine) {
+        const supabaseTasks = await loadTasksFromSupabase();
+        if (supabaseTasks.length > 0) {
+          setTasks(supabaseTasks);
+          localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
+          return;
         }
-    } catch (error) {
-        console.error("Failed to access localStorage", error);
+      }
+      
+      // Fall back to localStorage
+      const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
+      if (storedTasksRaw) {
+        setTasks(JSON.parse(storedTasksRaw));
+      } else {
+        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
         setTasks(fallbackTasks);
+      }
+    } catch (error) {
+      console.error("Failed to load tasks", error);
+      setTasks(fallbackTasks);
     }
   }
 
@@ -84,7 +97,7 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     setEditingTaskName('');
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingTaskName.trim()) {
       toast({
         variant: 'destructive',
@@ -96,9 +109,9 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     const updatedTasks = tasks.map(t => t.id === editingTaskId ? { ...t, name: editingTaskName } : t);
     setTasks(updatedTasks);
     try {
-        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(updatedTasks));
+      await saveTasks(updatedTasks);
     } catch (error) {
-        console.error("Failed to save to localStorage", error);
+      console.error("Failed to save tasks", error);
     }
 
     toast({
@@ -237,10 +250,12 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen bg-muted/40">
-        <AppLayoutContent>{children}</AppLayoutContent>
-      </div>
-    </SidebarProvider>
+    <SupabaseProvider>
+      <SidebarProvider>
+        <div className="flex min-h-screen bg-muted/40">
+          <AppLayoutContent>{children}</AppLayoutContent>
+        </div>
+      </SidebarProvider>
+    </SupabaseProvider>
   )
 }

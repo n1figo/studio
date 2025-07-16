@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Plus, Trash2, Edit, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -14,6 +14,8 @@ import { mockTasks as fallbackTasks } from '@/lib/mock-data';
 import { getIcon, iconList } from '@/lib/icons';
 import type { Task } from '@/lib/types';
 import { AiProjectDiscoverer } from '@/components/ai-project-discoverer';
+import { useSupabaseSync, saveTasks, loadTasksFromSupabase, deleteTask as deleteTaskFromSupabase } from '@/hooks/use-supabase-sync';
+import { supabase } from '@/lib/supabase';
 
 const TASKS_STORAGE_KEY = 'taskforge-tasks';
 
@@ -28,33 +30,60 @@ export default function ManageTasksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { toast } = useToast();
+  const { isOnline, isSyncing, syncOfflineData } = useSupabaseSync();
   
-  const loadTasks = () => {
-     try {
-        const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
-        if (storedTasksRaw) {
-            setTasks(JSON.parse(storedTasksRaw));
-        } else {
-            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-            setTasks(fallbackTasks);
+  const loadTasks = async () => {
+    try {
+      // First try to load from Supabase if online
+      if (navigator.onLine) {
+        const supabaseTasks = await loadTasksFromSupabase();
+        if (supabaseTasks.length > 0) {
+          setTasks(supabaseTasks);
+          localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
+          return;
         }
-    } catch (error) {
-        console.error("Failed to access localStorage", error);
+      }
+      
+      // Fall back to localStorage
+      const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
+      if (storedTasksRaw) {
+        setTasks(JSON.parse(storedTasksRaw));
+      } else {
+        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
         setTasks(fallbackTasks);
+      }
+    } catch (error) {
+      console.error("Failed to load tasks", error);
+      setTasks(fallbackTasks);
     }
   }
 
   useEffect(() => {
     loadTasks();
     
-    const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === TASKS_STORAGE_KEY && event.newValue) {
-            setTasks(JSON.parse(event.newValue));
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('tasks-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        (payload) => {
+          console.log('Task change received:', payload);
+          loadTasks(); // Reload tasks when changes occur
         }
+      )
+      .subscribe();
+    
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === TASKS_STORAGE_KEY && event.newValue) {
+        setTasks(JSON.parse(event.newValue));
+      }
     };
     window.addEventListener('storage', handleStorageChange);
+    
     return () => {
-        window.removeEventListener('storage', handleStorageChange);
+      supabase.removeChannel(channel);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -68,22 +97,23 @@ export default function ManageTasksPage() {
     setIsDialogOpen(true);
   };
 
-  const updateLocalStorage = (updatedTasks: Task[]) => {
+  const updateLocalStorage = async (updatedTasks: Task[]) => {
     try {
-        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(updatedTasks));
+      await saveTasks(updatedTasks);
     } catch (error) {
-        console.error("Failed to save to localStorage", error);
+      console.error("Failed to save tasks", error);
     }
   }
 
-  const handleDelete = (taskId: string) => {
+  const handleDelete = async (taskId: string) => {
     const updatedTasks = tasks.filter((task) => task.id !== taskId);
     setTasks(updatedTasks);
-    updateLocalStorage(updatedTasks);
+    await updateLocalStorage(updatedTasks);
+    await deleteTaskFromSupabase(taskId);
     toast({ title: '태스크 삭제됨', description: '태스크가 성공적으로 삭제되었습니다.' });
   };
   
-  const handleSave = (taskData: Omit<Task, 'id'> & { id?: string }) => {
+  const handleSave = async (taskData: Omit<Task, 'id'> & { id?: string }) => {
     let updatedTasks;
     if (taskData.id) {
       // Edit existing task
@@ -91,12 +121,12 @@ export default function ManageTasksPage() {
       toast({ title: '태스크 업데이트됨', description: '태스크가 저장되었습니다.' });
     } else {
       // Add new task
-      const newTask = { ...taskData, id: new Date().toISOString() };
+      const newTask = { ...taskData, id: crypto.randomUUID() };
       updatedTasks = [...tasks, newTask];
       toast({ title: '태스크 생성됨', description: '새로운 태스크가 준비되었습니다.' });
     }
     setTasks(updatedTasks);
-    updateLocalStorage(updatedTasks);
+    await updateLocalStorage(updatedTasks);
     setIsDialogOpen(false);
     setEditingTask(null);
   };
@@ -106,20 +136,30 @@ export default function ManageTasksPage() {
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">태스크 관리</h1>
-          <p className="text-muted-foreground">사용자 지정 태스크를 생성, 편집 및 구성하세요.</p>
+          <p className="text-muted-foreground">
+            사용자 지정 태스크를 생성, 편집 및 구성하세요.
+            {!isOnline && ' (오프라인 모드)'}
+          </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={handleAddNew}>
-              <Plus className="mr-2 h-4 w-4" /> 새 태스크 추가
+        <div className="flex gap-2">
+          {isSyncing && (
+            <Button variant="ghost" size="icon" disabled>
+              <RefreshCw className="h-4 w-4 animate-spin" />
             </Button>
-          </DialogTrigger>
-          <TaskFormDialog
-            task={editingTask}
-            onSave={handleSave}
-            onClose={() => setIsDialogOpen(false)}
-          />
-        </Dialog>
+          )}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={handleAddNew}>
+                <Plus className="mr-2 h-4 w-4" /> 새 태스크 추가
+              </Button>
+            </DialogTrigger>
+            <TaskFormDialog
+              task={editingTask}
+              onSave={handleSave}
+              onClose={() => setIsDialogOpen(false)}
+            />
+          </Dialog>
+        </div>
       </header>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
