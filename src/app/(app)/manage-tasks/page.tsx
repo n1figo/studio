@@ -34,23 +34,26 @@ export default function ManageTasksPage() {
   
   const loadTasks = async () => {
     try {
-      // First try to load from Supabase if online
-      if (navigator.onLine) {
-        const supabaseTasks = await loadTasksFromSupabase();
-        if (supabaseTasks.length > 0) {
-          setTasks(supabaseTasks);
-          localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
-          return;
-        }
-      }
-      
-      // Fall back to localStorage
+      // Always load from localStorage first for immediate display
       const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
       if (storedTasksRaw) {
         setTasks(JSON.parse(storedTasksRaw));
       } else {
         localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
         setTasks(fallbackTasks);
+      }
+
+      // Then try to load from Supabase if online
+      if (navigator.onLine) {
+        try {
+          const supabaseTasks = await loadTasksFromSupabase();
+          if (supabaseTasks.length > 0) {
+            setTasks(supabaseTasks);
+            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
+          }
+        } catch (supabaseError) {
+          console.error("Failed to load from Supabase, using local data", supabaseError);
+        }
       }
     } catch (error) {
       console.error("Failed to load tasks", error);

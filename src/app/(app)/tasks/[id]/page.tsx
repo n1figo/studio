@@ -34,29 +34,34 @@ export default function TaskBoardPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Load from Supabase if online
-        if (navigator.onLine) {
-          const [supabaseTasks, supabasePosts] = await Promise.all([
-            loadTasksFromSupabase(),
-            loadPostsFromSupabase()
-          ]);
-          
-          if (supabaseTasks.length > 0) {
-            setTasks(supabaseTasks);
-            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
-          }
-          
-          if (supabasePosts.length > 0) {
-            setPosts(supabasePosts);
-            localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(supabasePosts));
-          }
-        } else {
-          // Fall back to localStorage
-          const storedPosts = localStorage.getItem(POSTS_STORAGE_KEY);
-          setPosts(storedPosts ? JSON.parse(storedPosts) : fallbackPosts);
+        // Always load from localStorage first for immediate display
+        const storedPosts = localStorage.getItem(POSTS_STORAGE_KEY);
+        const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
+        
+        setPosts(storedPosts ? JSON.parse(storedPosts) : fallbackPosts);
+        setTasks(storedTasks ? JSON.parse(storedTasks) : fallbackTasks);
 
-          const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
-          setTasks(storedTasks ? JSON.parse(storedTasks) : fallbackTasks);
+        // Then try to load from Supabase if online
+        if (navigator.onLine) {
+          try {
+            const [supabaseTasks, supabasePosts] = await Promise.all([
+              loadTasksFromSupabase(),
+              loadPostsFromSupabase()
+            ]);
+            
+            // Update with Supabase data if available
+            if (supabaseTasks.length > 0) {
+              setTasks(supabaseTasks);
+              localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
+            }
+            
+            if (supabasePosts.length > 0) {
+              setPosts(supabasePosts);
+              localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(supabasePosts));
+            }
+          } catch (supabaseError) {
+            console.error("Failed to load from Supabase, using local data", supabaseError);
+          }
         }
       } catch (error) {
         console.error("Failed to load data", error);
