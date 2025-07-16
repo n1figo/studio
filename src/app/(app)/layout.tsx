@@ -65,6 +65,8 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Failed to load tasks", error);
       setTasks(fallbackTasks);
+      // Ensure fallback data is saved
+      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
     }
   }
 

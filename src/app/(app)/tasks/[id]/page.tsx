@@ -38,8 +38,20 @@ export default function TaskBoardPage() {
         const storedPosts = localStorage.getItem(POSTS_STORAGE_KEY);
         const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
         
-        setPosts(storedPosts ? JSON.parse(storedPosts) : fallbackPosts);
-        setTasks(storedTasks ? JSON.parse(storedTasks) : fallbackTasks);
+        // Use fallback data if no stored data
+        const localPosts = storedPosts ? JSON.parse(storedPosts) : fallbackPosts;
+        const localTasks = storedTasks ? JSON.parse(storedTasks) : fallbackTasks;
+        
+        setPosts(localPosts);
+        setTasks(localTasks);
+
+        // If no stored tasks, initialize with fallback data
+        if (!storedTasks) {
+          localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
+        }
+        if (!storedPosts) {
+          localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(fallbackPosts));
+        }
 
         // Then try to load from Supabase if online
         if (navigator.onLine) {
@@ -67,6 +79,9 @@ export default function TaskBoardPage() {
         console.error("Failed to load data", error);
         setPosts(fallbackPosts);
         setTasks(fallbackTasks);
+        // Ensure fallback data is saved
+        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
+        localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(fallbackPosts));
       }
     };
     
@@ -119,10 +134,24 @@ export default function TaskBoardPage() {
       .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [posts, taskId]);
 
-  const task = useMemo(() => tasks.find(t => t.id === taskId), [tasks, taskId]);
+  const task = useMemo(() => {
+    console.log('Looking for task with ID:', taskId);
+    console.log('Available tasks:', tasks.map(t => ({ id: t.id, name: t.name })));
+    return tasks.find(t => t.id === taskId);
+  }, [tasks, taskId]);
   
   if (!task) {
-    return <div className="text-center">태스크를 찾을 수 없습니다.</div>;
+    return (
+      <div className="text-center space-y-4">
+        <div>태스크를 찾을 수 없습니다.</div>
+        <div className="text-sm text-muted-foreground">
+          찾는 태스크 ID: {taskId}
+        </div>
+        <div className="text-sm text-muted-foreground">
+          사용 가능한 태스크: {tasks.length}개
+        </div>
+      </div>
+    );
   }
 
   const handleSavePost = async (newPostData: Omit<Post, 'id' | 'taskId' | 'createdAt'>) => {
