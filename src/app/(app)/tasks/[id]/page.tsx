@@ -26,14 +26,21 @@ export default function TaskBoardPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadData = async () => {
       try {
+        setIsLoading(true);
+        console.log('Loading data for task ID:', taskId);
+        
         const [tasksData, postsData] = await Promise.all([
           loadTasksFromSupabase(),
           loadPostsFromSupabase()
         ]);
+        
+        console.log('Loaded tasks:', tasksData.length);
+        console.log('Loaded posts:', postsData.length);
         
         setTasks(tasksData);
         setPosts(postsData);
@@ -41,6 +48,8 @@ export default function TaskBoardPage() {
         console.error("Failed to load data", error);
         setTasks([]);
         setPosts([]);
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -88,6 +97,17 @@ export default function TaskBoardPage() {
     return tasks.find(t => t.id === taskId);
   }, [tasks, taskId]);
   
+  if (isLoading) {
+    return (
+      <div className="text-center space-y-4">
+        <div>데이터를 불러오는 중...</div>
+        <div className="text-sm text-muted-foreground">
+          태스크 ID: {taskId}
+        </div>
+      </div>
+    );
+  }
+  
   if (!task) {
     return (
       <div className="text-center space-y-4">
@@ -98,9 +118,11 @@ export default function TaskBoardPage() {
         <div className="text-sm text-muted-foreground">
           사용 가능한 태스크: {tasks.length}개
         </div>
-        {tasks.length === 0 && (
+        {tasks.length > 0 && (
           <div className="text-sm text-muted-foreground">
-            데이터를 불러오는 중...
+            사용 가능한 태스크들:
+            <br />
+            {tasks.map(t => `${t.name} (${t.id})`).join(', ')}
           </div>
         )}
       </div>
