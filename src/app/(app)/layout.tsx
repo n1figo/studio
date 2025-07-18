@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
 import { Home, Settings, Plus, Star, Pencil, Check, X } from 'lucide-react';
-import { mockTasks as fallbackTasks } from '@/lib/mock-data';
 import { getIcon } from '@/lib/icons';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePathname } from 'next/navigation';
@@ -26,9 +25,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { Task } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { SupabaseProvider } from '@/components/supabase-provider';
-import { saveTasks, loadTasksFromSupabase } from '@/hooks/use-supabase-sync';
-
-const TASKS_STORAGE_KEY = 'taskforge-tasks';
+import { loadTasksFromSupabase, updateTask } from '@/hooks/use-supabase-sync';
+import { supabase } from '@/lib/supabase';
 
 function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -41,48 +39,32 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
 
   const loadTasks = async () => {
     try {
-      // Always load from localStorage first for immediate display
-      const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
-      if (storedTasksRaw) {
-        setTasks(JSON.parse(storedTasksRaw));
-      } else {
-        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-        setTasks(fallbackTasks);
-      }
-
-      // Then try to load from Supabase if online
-      if (navigator.onLine) {
-        try {
-          const supabaseTasks = await loadTasksFromSupabase();
-          if (supabaseTasks.length > 0) {
-            setTasks(supabaseTasks);
-            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
-          }
-        } catch (supabaseError) {
-          console.error("Failed to load from Supabase, using local data", supabaseError);
-        }
-      }
+      const tasks = await loadTasksFromSupabase();
+      setTasks(tasks);
     } catch (error) {
       console.error("Failed to load tasks", error);
-      setTasks(fallbackTasks);
-      // Ensure fallback data is saved
-      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
+      setTasks([]);
     }
   }
 
   useEffect(() => {
     loadTasks();
     
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === TASKS_STORAGE_KEY && event.newValue) {
-        setTasks(JSON.parse(event.newValue));
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('tasks-changes-layout')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tasks' },
+        (payload) => {
+          console.log('Task change received in layout:', payload);
+          loadTasks();
+        }
+      )
+      .subscribe();
 
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -111,12 +93,17 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    const updatedTasks = tasks.map(t => t.id === editingTaskId ? { ...t, name: editingTaskName } : t);
-    setTasks(updatedTasks);
     try {
-      await saveTasks(updatedTasks);
+      const updatedTask = await updateTask(editingTaskId!, { name: editingTaskName });
+      setTasks(tasks.map(t => t.id === editingTaskId ? updatedTask : t));
     } catch (error) {
-      console.error("Failed to save tasks", error);
+      console.error("Failed to update task", error);
+      toast({
+        variant: 'destructive',
+        title: '오류',
+        description: '태스크 업데이트 중 오류가 발생했습니다.',
+      });
+      return;
     }
 
     toast({

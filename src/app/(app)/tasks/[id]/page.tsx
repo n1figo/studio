@@ -12,14 +12,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { mockTasks as fallbackTasks, mockPosts as fallbackPosts } from '@/lib/mock-data';
 import type { Post, Task } from '@/lib/types';
 import { getIcon } from '@/lib/icons';
-import { useSupabaseSync, savePosts, loadPostsFromSupabase, loadTasksFromSupabase, deletePost as deletePostFromSupabase } from '@/hooks/use-supabase-sync';
+import { useSupabaseSync, loadPostsFromSupabase, loadTasksFromSupabase, createPost, deletePost } from '@/hooks/use-supabase-sync';
 import { supabase } from '@/lib/supabase';
-
-const POSTS_STORAGE_KEY = 'taskforge-posts';
-const TASKS_STORAGE_KEY = 'taskforge-tasks';
 
 export default function TaskBoardPage() {
   const params = useParams();
@@ -34,54 +30,17 @@ export default function TaskBoardPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Always load from localStorage first for immediate display
-        const storedPosts = localStorage.getItem(POSTS_STORAGE_KEY);
-        const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
+        const [tasksData, postsData] = await Promise.all([
+          loadTasksFromSupabase(),
+          loadPostsFromSupabase()
+        ]);
         
-        // Use fallback data if no stored data
-        const localPosts = storedPosts ? JSON.parse(storedPosts) : fallbackPosts;
-        const localTasks = storedTasks ? JSON.parse(storedTasks) : fallbackTasks;
-        
-        setPosts(localPosts);
-        setTasks(localTasks);
-
-        // If no stored tasks, initialize with fallback data
-        if (!storedTasks) {
-          localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-        }
-        if (!storedPosts) {
-          localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(fallbackPosts));
-        }
-
-        // Then try to load from Supabase if online
-        if (navigator.onLine) {
-          try {
-            const [supabaseTasks, supabasePosts] = await Promise.all([
-              loadTasksFromSupabase(),
-              loadPostsFromSupabase()
-            ]);
-            
-            // Update with Supabase data if available
-            if (supabaseTasks.length > 0) {
-              setTasks(supabaseTasks);
-              localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
-            }
-            
-            if (supabasePosts.length > 0) {
-              setPosts(supabasePosts);
-              localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(supabasePosts));
-            }
-          } catch (supabaseError) {
-            console.error("Failed to load from Supabase, using local data", supabaseError);
-          }
-        }
+        setTasks(tasksData);
+        setPosts(postsData);
       } catch (error) {
         console.error("Failed to load data", error);
-        setPosts(fallbackPosts);
-        setTasks(fallbackTasks);
-        // Ensure fallback data is saved
-        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-        localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(fallbackPosts));
+        setTasks([]);
+        setPosts([]);
       }
     };
     
@@ -89,12 +48,12 @@ export default function TaskBoardPage() {
     
     // Set up real-time subscriptions
     const postsChannel = supabase
-      .channel('posts-changes')
+      .channel('posts-changes-detail')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'posts', filter: `task_id=eq.${taskId}` },
+        { event: '*', schema: 'public', table: 'posts' },
         (payload) => {
-          console.log('Post change received:', payload);
+          console.log('Post change received in detail:', payload);
           loadData();
         }
       )
@@ -106,26 +65,15 @@ export default function TaskBoardPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks' },
         (payload) => {
-          console.log('Task change received:', payload);
+          console.log('Task change received in detail:', payload);
           loadData();
         }
       )
       .subscribe();
-    
-    // Listen for storage changes
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === TASKS_STORAGE_KEY && event.newValue) {
-        setTasks(JSON.parse(event.newValue));
-      } else if (event.key === POSTS_STORAGE_KEY && event.newValue) {
-        setPosts(JSON.parse(event.newValue));
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       supabase.removeChannel(postsChannel);
       supabase.removeChannel(tasksChannel);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, [taskId]);
 
@@ -150,46 +98,51 @@ export default function TaskBoardPage() {
         <div className="text-sm text-muted-foreground">
           사용 가능한 태스크: {tasks.length}개
         </div>
+        {tasks.length === 0 && (
+          <div className="text-sm text-muted-foreground">
+            데이터를 불러오는 중...
+          </div>
+        )}
       </div>
     );
   }
 
   const handleSavePost = async (newPostData: Omit<Post, 'id' | 'taskId' | 'createdAt'>) => {
-    const newPost: Post = {
-      ...newPostData,
-      id: crypto.randomUUID(),
-      taskId: task.id,
-      createdAt: new Date().toISOString(),
-    };
-    
-    const updatedPosts = [newPost, ...posts];
-    setPosts(updatedPosts);
-    
     try {
-      await savePosts(updatedPosts);
+      const newPost = await createPost({
+        ...newPostData,
+        taskId: task.id,
+      });
+      
+      setPosts([newPost, ...posts]);
+      toast({ title: '게시물 생성됨', description: '진행 상황이 기록되었습니다.' });
+      setIsDialogOpen(false);
     } catch(error) {
-      console.error("Failed to save posts", error);
+      console.error("Failed to save post", error);
+      toast({ 
+        variant: 'destructive',
+        title: '오류', 
+        description: '게시물 생성 중 오류가 발생했습니다.' 
+      });
     }
-
-    toast({ title: '게시물 생성됨', description: '진행 상황이 기록되었습니다.' });
-    setIsDialogOpen(false);
   };
   
   const handleDeletePost = async (postId: string) => {
-    const updatedPosts = posts.filter((post) => post.id !== postId);
-    setPosts(updatedPosts);
-    
     try {
-      await savePosts(updatedPosts);
-      await deletePostFromSupabase(postId);
+      await deletePost(postId);
+      setPosts(posts.filter((post) => post.id !== postId));
+      toast({
+        title: '게시물 삭제됨',
+        description: '게시물이 성공적으로 삭제되었습니다.',
+      });
     } catch(error) {
       console.error("Failed to delete post", error);
+      toast({ 
+        variant: 'destructive',
+        title: '오류', 
+        description: '게시물 삭제 중 오류가 발생했습니다.' 
+      });
     }
-    
-    toast({
-      title: '게시물 삭제됨',
-      description: '게시물이 성공적으로 삭제되었습니다.',
-    });
   };
 
   const Icon = getIcon(task.icon);

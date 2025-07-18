@@ -6,14 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Cloud, CloudOff } from 'lucide-react';
 
 export function SupabaseProvider({ children }: { children: React.ReactNode }) {
-  const { isOnline, syncOfflineData } = useSupabaseSync();
-
-  useEffect(() => {
-    // Sync data when the app loads if online
-    if (isOnline) {
-      syncOfflineData();
-    }
-  }, [isOnline, syncOfflineData]);
+  const { isOnline } = useSupabaseSync();
 
   return (
     <>

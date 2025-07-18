@@ -10,14 +10,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { mockTasks as fallbackTasks } from '@/lib/mock-data';
 import { getIcon, iconList } from '@/lib/icons';
 import type { Task } from '@/lib/types';
 import { AiProjectDiscoverer } from '@/components/ai-project-discoverer';
-import { useSupabaseSync, saveTasks, loadTasksFromSupabase, deleteTask as deleteTaskFromSupabase } from '@/hooks/use-supabase-sync';
+import { useSupabaseSync, loadTasksFromSupabase, createTask, updateTask, deleteTask } from '@/hooks/use-supabase-sync';
 import { supabase } from '@/lib/supabase';
-
-const TASKS_STORAGE_KEY = 'taskforge-tasks';
 
 const colorPresets = [
   'hsl(347, 89%, 60%)', 'hsl(210, 89%, 60%)', 'hsl(110, 89%, 60%)',
@@ -30,36 +27,15 @@ export default function ManageTasksPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { toast } = useToast();
-  const { isOnline, isSyncing, syncOfflineData } = useSupabaseSync();
+  const { isOnline, isSyncing } = useSupabaseSync();
   
   const loadTasks = async () => {
     try {
-      // Always load from localStorage first for immediate display
-      const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
-      if (storedTasksRaw) {
-        setTasks(JSON.parse(storedTasksRaw));
-      } else {
-        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-        setTasks(fallbackTasks);
-      }
-
-      // Then try to load from Supabase if online
-      if (navigator.onLine) {
-        try {
-          const supabaseTasks = await loadTasksFromSupabase();
-          if (supabaseTasks.length > 0) {
-            setTasks(supabaseTasks);
-            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
-          }
-        } catch (supabaseError) {
-          console.error("Failed to load from Supabase, using local data", supabaseError);
-        }
-      }
+      const tasks = await loadTasksFromSupabase();
+      setTasks(tasks);
     } catch (error) {
       console.error("Failed to load tasks", error);
-      setTasks(fallbackTasks);
-      // Ensure fallback data is saved
-      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
+      setTasks([]);
     }
   }
 
@@ -68,27 +44,19 @@ export default function ManageTasksPage() {
     
     // Set up real-time subscription
     const channel = supabase
-      .channel('tasks-changes')
+      .channel('tasks-changes-manage')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks' },
         (payload) => {
-          console.log('Task change received:', payload);
-          loadTasks(); // Reload tasks when changes occur
+          console.log('Task change received in manage-tasks:', payload);
+          loadTasks();
         }
       )
       .subscribe();
     
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === TASKS_STORAGE_KEY && event.newValue) {
-        setTasks(JSON.parse(event.newValue));
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    
     return () => {
       supabase.removeChannel(channel);
-      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -102,38 +70,45 @@ export default function ManageTasksPage() {
     setIsDialogOpen(true);
   };
 
-  const updateLocalStorage = async (updatedTasks: Task[]) => {
-    try {
-      await saveTasks(updatedTasks);
-    } catch (error) {
-      console.error("Failed to save tasks", error);
-    }
-  }
 
   const handleDelete = async (taskId: string) => {
-    const updatedTasks = tasks.filter((task) => task.id !== taskId);
-    setTasks(updatedTasks);
-    await updateLocalStorage(updatedTasks);
-    await deleteTaskFromSupabase(taskId);
-    toast({ title: '태스크 삭제됨', description: '태스크가 성공적으로 삭제되었습니다.' });
+    try {
+      await deleteTask(taskId);
+      setTasks(tasks.filter((task) => task.id !== taskId));
+      toast({ title: '태스크 삭제됨', description: '태스크가 성공적으로 삭제되었습니다.' });
+    } catch (error) {
+      console.error("Failed to delete task", error);
+      toast({ 
+        variant: 'destructive',
+        title: '오류', 
+        description: '태스크 삭제 중 오류가 발생했습니다.' 
+      });
+    }
   };
   
   const handleSave = async (taskData: Omit<Task, 'id'> & { id?: string }) => {
-    let updatedTasks;
-    if (taskData.id) {
-      // Edit existing task
-      updatedTasks = tasks.map(t => t.id === taskData.id ? { ...t, ...taskData } : t);
-      toast({ title: '태스크 업데이트됨', description: '태스크가 저장되었습니다.' });
-    } else {
-      // Add new task
-      const newTask = { ...taskData, id: crypto.randomUUID() };
-      updatedTasks = [...tasks, newTask];
-      toast({ title: '태스크 생성됨', description: '새로운 태스크가 준비되었습니다.' });
+    try {
+      if (taskData.id) {
+        // Edit existing task
+        const updatedTask = await updateTask(taskData.id, taskData);
+        setTasks(tasks.map(t => t.id === taskData.id ? updatedTask : t));
+        toast({ title: '태스크 업데이트됨', description: '태스크가 저장되었습니다.' });
+      } else {
+        // Add new task
+        const newTask = await createTask(taskData);
+        setTasks([...tasks, newTask]);
+        toast({ title: '태스크 생성됨', description: '새로운 태스크가 준비되었습니다.' });
+      }
+      setIsDialogOpen(false);
+      setEditingTask(null);
+    } catch (error) {
+      console.error("Failed to save task", error);
+      toast({ 
+        variant: 'destructive',
+        title: '오류', 
+        description: '태스크 저장 중 오류가 발생했습니다.' 
+      });
     }
-    setTasks(updatedTasks);
-    await updateLocalStorage(updatedTasks);
-    setIsDialogOpen(false);
-    setEditingTask(null);
   };
 
   return (
