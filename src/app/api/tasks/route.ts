@@ -6,13 +6,19 @@ async function connectToDatabase() {
     // 서버 사이드에서만 pg 모듈 동적 import
     const { Pool } = await import('pg');
     
-    const pool = new Pool({
-      host: 'postgres',
-      port: 5432,
-      database: 'studio_dev',
-      user: 'studio_user',
-      password: 'studio_password',
-    });
+    // Vercel 배포 시에는 POSTGRES_URL 사용, 로컬에서는 개별 환경 변수 사용
+    const pool = process.env.POSTGRES_URL 
+      ? new Pool({
+          connectionString: process.env.POSTGRES_URL,
+          ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+        })
+      : new Pool({
+          host: process.env.POSTGRES_HOST || 'postgres',
+          port: parseInt(process.env.POSTGRES_PORT || '5432'),
+          database: process.env.POSTGRES_DATABASE || 'studio_dev',
+          user: process.env.POSTGRES_USER || 'studio_user',
+          password: process.env.POSTGRES_PASSWORD || 'studio_password',
+        });
 
     return pool;
   } catch (error) {
