@@ -10,5 +10,17 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+  # 추가 옵션들:
+  # path_filters:
+  #   - "!**/*.test.ts" # 테스트 파일은 리뷰하지 않음
+  #   - "!**/*.spec.ts"
+  # knowledge_base:
+  #   learnings:
+  #     enabled: true # 프로젝트 학습 기능
+  # tools:
+  #   eslint:
+  #     enabled: true
+  #   ruff:
+  #     enabled: false
 chat:
   auto_reply: true
