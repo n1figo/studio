@@ -1,17 +1,35 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://zvmwjdrdalnjvhnddssy.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp2bXdqZHJkYWxuanZobmRkc3N5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2NzUxNDMsImV4cCI6MjA2ODI1MTE0M30.yqrPtKVIO-QG13mqtzmPHYs9BYIcVV_Sh5TUk3j-QYI';
+// 로컬 개발환경에서는 환경변수가 없으면 에러 처리
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-console.log('Supabase URL:', supabaseUrl);
-console.log('Supabase Key (first 20 chars):', supabaseAnonKey.substring(0, 20) + '...');
+console.log('Environment check:');
+console.log('- NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl);
+console.log('- NEXT_PUBLIC_SUPABASE_ANON_KEY:', supabaseAnonKey ? 'Set' : 'Not set');
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+// 로컬 개발환경에서 Supabase 환경변수가 없으면 더미 클라이언트 생성
+let supabaseClient;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase environment variables not set. Using dummy client for development.');
+  // 더미 URL로 클라이언트 생성 (실제 연결 없음)
+  supabaseClient = createClient('http://localhost:54321', 'dummy-key', {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+} else {
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
+  });
+}
+
+export const supabase = supabaseClient;
 
 export type Database = {
   public: {

@@ -14,19 +14,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import type { Post, Task } from '@/lib/types';
 import { getIcon } from '@/lib/icons';
-import { useSupabaseSync, loadPostsFromSupabase, loadTasksFromSupabase, createPost, deletePost } from '@/hooks/use-supabase-sync';
-import { supabase } from '@/lib/supabase';
 
 export default function TaskBoardPage() {
   const params = useParams();
   const taskId = params.id as string;
   const { toast } = useToast();
-  const { isOnline, isSyncing } = useSupabaseSync();
+  // useSupabaseSync 제거
 
   const [posts, setPosts] = useState<Post[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOnline] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -34,16 +34,40 @@ export default function TaskBoardPage() {
         setIsLoading(true);
         console.log('Loading data for task ID:', taskId);
         
-        const [tasksData, postsData] = await Promise.all([
-          loadTasksFromSupabase(),
-          loadPostsFromSupabase()
+        const [tasksResponse, postsResponse] = await Promise.all([
+          fetch('/api/tasks'),
+          fetch('/api/posts')
         ]);
+
+        if (!tasksResponse.ok || !postsResponse.ok) {
+          throw new Error('Failed to fetch data');
+        }
+
+        const apiTasks = await tasksResponse.json();
+        const apiPosts = await postsResponse.json();
         
-        console.log('Loaded tasks:', tasksData.length);
-        console.log('Loaded posts:', postsData.length);
+        console.log('Loaded tasks:', apiTasks.length);
+        console.log('Loaded posts:', apiPosts.length);
         
-        setTasks(tasksData);
-        setPosts(postsData);
+        // API 데이터를 애플리케이션 형식으로 변환
+        const formattedTasks: Task[] = apiTasks.map((task: any) => ({
+          id: task.id,
+          name: task.name,
+          icon: task.icon,
+          color: task.color,
+          description: task.description || undefined,
+        }));
+
+        const formattedPosts: Post[] = apiPosts.map((post: any) => ({
+          id: post.id,
+          taskId: post.task_id,
+          title: post.title,
+          content: post.content,
+          createdAt: post.created_at,
+        }));
+        
+        setTasks(formattedTasks);
+        setPosts(formattedPosts);
       } catch (error) {
         console.error("Failed to load data", error);
         setTasks([]);
@@ -55,34 +79,20 @@ export default function TaskBoardPage() {
     
     loadData();
     
-    // Set up real-time subscriptions
-    const postsChannel = supabase
-      .channel('posts-changes-detail')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'posts' },
-        (payload) => {
-          console.log('Post change received in detail:', payload);
-          loadData();
-        }
-      )
-      .subscribe();
-      
-    const tasksChannel = supabase
-      .channel('tasks-changes-detail')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks' },
-        (payload) => {
-          console.log('Task change received in detail:', payload);
-          loadData();
-        }
-      )
-      .subscribe();
+    // Polling으로 주기적 데이터 업데이트
+    const pollingInterval = setInterval(() => {
+      loadData();
+    }, 30000); // 30초마다 업데이트
+
+    // Window focus 시 데이터 새로고침
+    const handleWindowFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleWindowFocus);
 
     return () => {
-      supabase.removeChannel(postsChannel);
-      supabase.removeChannel(tasksChannel);
+      clearInterval(pollingInterval);
+      window.removeEventListener('focus', handleWindowFocus);
     };
   }, [taskId]);
 
@@ -131,10 +141,30 @@ export default function TaskBoardPage() {
 
   const handleSavePost = async (newPostData: Omit<Post, 'id' | 'taskId' | 'createdAt'>) => {
     try {
-      const newPost = await createPost({
-        ...newPostData,
-        taskId: task.id,
+      setIsSyncing(true);
+      const response = await fetch('/api/posts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...newPostData,
+          task_id: task.id,
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to create post');
+      }
+
+      const apiPost = await response.json();
+      const newPost: Post = {
+        id: apiPost.id,
+        taskId: apiPost.task_id,
+        title: apiPost.title,
+        content: apiPost.content,
+        createdAt: apiPost.created_at,
+      };
       
       setPosts([newPost, ...posts]);
       toast({ title: '게시물 생성됨', description: '진행 상황이 기록되었습니다.' });
@@ -146,12 +176,26 @@ export default function TaskBoardPage() {
         title: '오류', 
         description: '게시물 생성 중 오류가 발생했습니다.' 
       });
+    } finally {
+      setIsSyncing(false);
     }
   };
   
   const handleDeletePost = async (postId: string) => {
     try {
-      await deletePost(postId);
+      setIsSyncing(true);
+      const response = await fetch('/api/posts', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: postId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete post');
+      }
+
       setPosts(posts.filter((post) => post.id !== postId));
       toast({
         title: '게시물 삭제됨',
@@ -164,6 +208,8 @@ export default function TaskBoardPage() {
         title: '오류', 
         description: '게시물 삭제 중 오류가 발생했습니다.' 
       });
+    } finally {
+      setIsSyncing(false);
     }
   };
 

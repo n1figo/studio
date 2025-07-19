@@ -18,6 +18,8 @@ import { mockTasks as fallbackTasks, mockPosts as fallbackPosts } from '@/lib/mo
 import { getIcon } from '@/lib/icons';
 import { cn } from '@/lib/utils';
 import type { DailyStatus, DailyRecord, Post, Task } from '@/lib/types';
+import { loadTasksFromSupabase, loadPostsFromSupabase } from '@/hooks/use-supabase-sync';
+import { supabase } from '@/lib/supabase';
 
 const POSTS_STORAGE_KEY = 'taskforge-posts';
 const TASKS_STORAGE_KEY = 'taskforge-tasks';
@@ -59,16 +61,55 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
 
-  const loadData = () => {
-    let storedPosts: Post[];
-    let storedTasks: Task[];
+  const loadData = async () => {
+    try {
+      // API에서 데이터 로드 시도
+      const [tasksResponse, postsResponse] = await Promise.all([
+        fetch('/api/tasks'),
+        fetch('/api/posts')
+      ]);
+
+      if (tasksResponse.ok && postsResponse.ok) {
+        const apiTasks = await tasksResponse.json();
+        const apiPosts = await postsResponse.json();
+
+        console.log('Loaded from API:', { tasks: apiTasks.length, posts: apiPosts.length });
+        
+        // API 데이터를 애플리케이션 형식으로 변환
+        const formattedTasks: Task[] = apiTasks.map((task: any) => ({
+          id: task.id,
+          name: task.name,
+          icon: task.icon,
+          color: task.color,
+          description: task.description || undefined,
+        }));
+
+        const formattedPosts: Post[] = apiPosts.map((post: any) => ({
+          id: post.id,
+          taskId: post.task_id,
+          title: post.title,
+          content: post.content,
+          createdAt: post.created_at,
+        }));
+
+        setTasks(formattedTasks);
+        setPosts(formattedPosts);
+        const dynamicRecords = generateDailyRecords(formattedTasks, formattedPosts);
+        setRecords(dynamicRecords);
+        return;
+      }
+    } catch (error) {
+      console.error("Failed to load from API, using fallback data:", error);
+    }
+
+    // Fallback: localStorage 또는 mock 데이터 사용
     try {
       const storedPostsRaw = localStorage.getItem(POSTS_STORAGE_KEY);
-      storedPosts = storedPostsRaw ? JSON.parse(storedPostsRaw) : fallbackPosts;
+      const storedPosts = storedPostsRaw ? JSON.parse(storedPostsRaw) : fallbackPosts;
       setPosts(storedPosts);
 
       const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
-      storedTasks = storedTasksRaw ? JSON.parse(storedTasksRaw) : fallbackTasks;
+      const storedTasks = storedTasksRaw ? JSON.parse(storedTasksRaw) : fallbackTasks;
       setTasks(storedTasks);
       
       const dynamicRecords = generateDailyRecords(storedTasks, storedPosts);
@@ -86,7 +127,12 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData();
 
-    // Listen for storage changes to update the dashboard
+    // Polling으로 주기적 데이터 업데이트 (실시간 동기화 대안)
+    const pollingInterval = setInterval(() => {
+      loadData();
+    }, 30000); // 30초마다 업데이트
+
+    // Listen for storage changes as fallback
     const handleStorageChange = (event: StorageEvent) => {
         if (event.key === POSTS_STORAGE_KEY || event.key === TASKS_STORAGE_KEY) {
              loadData();
@@ -94,8 +140,16 @@ export default function DashboardPage() {
     }
     window.addEventListener('storage', handleStorageChange);
 
+    // Window focus 시 데이터 새로고침
+    const handleWindowFocus = () => {
+      loadData();
+    };
+    window.addEventListener('focus', handleWindowFocus);
+
     return () => {
+        clearInterval(pollingInterval);
         window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('focus', handleWindowFocus);
     }
   }, []);
 

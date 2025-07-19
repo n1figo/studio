@@ -1,0 +1,76 @@
+# Docker Compose file for Studio development environment
+
+services:
+  # Main application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "9002:9002"
+    environment:
+      - NODE_ENV=development
+      - NEXT_TELEMETRY_DISABLED=1
+    env_file:
+      - .env.local
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - studio-network
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=studio_dev
+      - POSTGRES_USER=studio_user
+      - POSTGRES_PASSWORD=studio_password
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - studio-network
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - studio-network
+
+  # Supabase local development (commented out - use Supabase CLI instead)
+  # supabase:
+  #   image: supabase/postgres:15.1.0.147
+  #   environment:
+  #     - POSTGRES_HOST=postgres
+  #     - POSTGRES_DB=studio_dev
+  #     - POSTGRES_USER=studio_user
+  #     - POSTGRES_PASSWORD=studio_password
+  #     - JWT_SECRET=your-jwt-secret-here
+  #     - ANON_KEY=your-anon-key-here
+  #     - SERVICE_ROLE_KEY=your-service-role-key-here
+  #   ports:
+  #     - "54321:54321"
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - studio-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  studio-network:
+    driver: bridge
