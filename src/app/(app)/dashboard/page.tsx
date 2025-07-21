@@ -14,7 +14,6 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { mockTasks as fallbackTasks, mockPosts as fallbackPosts } from '@/lib/mock-data';
 import { getIcon } from '@/lib/icons';
 import { cn } from '@/lib/utils';
 import type { DailyStatus, DailyRecord, Post, Task } from '@/lib/types';
@@ -29,13 +28,28 @@ const statusStyles: { [key in DailyStatus]: string } = {
 };
 
 const generateDailyRecords = (tasks: Task[], posts: Post[]): DailyRecord => {
+  // Generate records for ALL days that might be displayed, not just last 31 days
+  const allDates = new Set<string>();
+  
+  // Add all days from the past 12 months to ensure we have data for any month view
+  for (let monthOffset = -12; monthOffset <= 0; monthOffset++) {
+    const targetDate = new Date();
+    targetDate.setMonth(targetDate.getMonth() + monthOffset);
+    const start = startOfMonth(targetDate);
+    const end = endOfMonth(targetDate);
+    const days = eachDayOfInterval({ start, end });
+    
+    days.forEach(day => {
+      allDates.add(format(day, 'yyyy-MM-dd'));
+    });
+  }
+  
   return tasks.reduce((acc, task) => {
     acc[task.id] = {};
-    for (let i = 0; i < 31; i++) { // Generate for the last 31 days for context
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateString = format(date, 'yyyy-MM-dd');
-      
+    
+    // Process all dates we might need
+    allDates.forEach(dateString => {
+      const date = new Date(dateString);
       const postExists = posts.some(
         (post) => post.taskId === task.id && format(new Date(post.createdAt), 'yyyy-MM-dd') === dateString
       );
@@ -47,7 +61,8 @@ const generateDailyRecords = (tasks: Task[], posts: Post[]): DailyRecord => {
       } else {
         acc[task.id][dateString] = ' ';
       }
-    }
+    });
+    
     return acc;
   }, {} as DailyRecord);
 };
@@ -59,27 +74,66 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
 
-  const loadData = () => {
-    let storedPosts: Post[];
-    let storedTasks: Task[];
+  const loadData = async () => {
     try {
-      const storedPostsRaw = localStorage.getItem(POSTS_STORAGE_KEY);
-      storedPosts = storedPostsRaw ? JSON.parse(storedPostsRaw) : fallbackPosts;
-      setPosts(storedPosts);
+      // Load tasks from API
+      const tasksResponse = await fetch('/api/tasks');
+      let loadedTasks: Task[] = [];
+      if (tasksResponse.ok) {
+        const apiTasks = await tasksResponse.json();
+        loadedTasks = apiTasks.map((task: any) => ({
+          id: task.id,
+          name: task.name,
+          icon: task.icon,
+          color: task.color,
+          description: task.description || undefined,
+        }));
+        setTasks(loadedTasks);
+      } else {
+        throw new Error('Failed to fetch tasks');
+      }
 
-      const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
-      storedTasks = storedTasksRaw ? JSON.parse(storedTasksRaw) : fallbackTasks;
-      setTasks(storedTasks);
+      // Load posts from API
+      const postsResponse = await fetch('/api/posts');
+      let loadedPosts: Post[] = [];
+      if (postsResponse.ok) {
+        const apiPosts = await postsResponse.json();
+        loadedPosts = apiPosts.map((post: any) => ({
+          id: post.id,
+          taskId: post.task_id,
+          title: post.title,
+          content: post.content,
+          createdAt: post.created_at,
+        }));
+        setPosts(loadedPosts);
+      } else {
+        throw new Error('Failed to fetch posts');
+      }
       
-      const dynamicRecords = generateDailyRecords(storedTasks, storedPosts);
+      const dynamicRecords = generateDailyRecords(loadedTasks, loadedPosts);
       setRecords(dynamicRecords);
 
     } catch (error) {
-      console.error("Failed to access localStorage", error);
-      setPosts(fallbackPosts);
-      setTasks(fallbackTasks);
-      const dynamicRecords = generateDailyRecords(fallbackTasks, fallbackPosts);
-      setRecords(dynamicRecords);
+      console.error("Failed to load data from API, using localStorage fallback", error);
+      // Fallback to localStorage
+      try {
+        const storedPostsRaw = localStorage.getItem(POSTS_STORAGE_KEY);
+        const storedPosts = storedPostsRaw ? JSON.parse(storedPostsRaw) : [];
+        setPosts(storedPosts);
+
+        const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
+        const storedTasks = storedTasksRaw ? JSON.parse(storedTasksRaw) : [];
+        setTasks(storedTasks);
+        
+        const dynamicRecords = generateDailyRecords(storedTasks, storedPosts);
+        setRecords(dynamicRecords);
+      } catch (localError) {
+        console.error("Failed to access localStorage", localError);
+        setPosts([]);
+        setTasks([]);
+        const dynamicRecords = generateDailyRecords([], []);
+        setRecords(dynamicRecords);
+      }
     }
   };
 

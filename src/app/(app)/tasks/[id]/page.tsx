@@ -12,7 +12,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { mockTasks as fallbackTasks, mockPosts as fallbackPosts } from '@/lib/mock-data';
 import type { Post, Task } from '@/lib/types';
 import { getIcon } from '@/lib/icons';
 import { useSupabaseSync, savePosts, loadPostsFromSupabase, loadTasksFromSupabase, deletePost as deletePostFromSupabase } from '@/hooks/use-supabase-sync';
@@ -34,54 +33,41 @@ export default function TaskBoardPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Always load from localStorage first for immediate display
-        const storedPosts = localStorage.getItem(POSTS_STORAGE_KEY);
-        const storedTasks = localStorage.getItem(TASKS_STORAGE_KEY);
-        
-        // Use fallback data if no stored data
-        const localPosts = storedPosts ? JSON.parse(storedPosts) : fallbackPosts;
-        const localTasks = storedTasks ? JSON.parse(storedTasks) : fallbackTasks;
-        
-        setPosts(localPosts);
-        setTasks(localTasks);
-
-        // If no stored tasks, initialize with fallback data
-        if (!storedTasks) {
-          localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-        }
-        if (!storedPosts) {
-          localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(fallbackPosts));
+        // Load tasks from API
+        const tasksResponse = await fetch('/api/tasks');
+        if (tasksResponse.ok) {
+          const apiTasks = await tasksResponse.json();
+          const formattedTasks: Task[] = apiTasks.map((task: any) => ({
+            id: task.id,
+            name: task.name,
+            icon: task.icon,
+            color: task.color,
+            description: task.description || undefined,
+          }));
+          setTasks(formattedTasks);
+        } else {
+          throw new Error('Failed to fetch tasks');
         }
 
-        // Then try to load from Supabase if online
-        if (navigator.onLine) {
-          try {
-            const [supabaseTasks, supabasePosts] = await Promise.all([
-              loadTasksFromSupabase(),
-              loadPostsFromSupabase()
-            ]);
-            
-            // Update with Supabase data if available
-            if (supabaseTasks.length > 0) {
-              setTasks(supabaseTasks);
-              localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
-            }
-            
-            if (supabasePosts.length > 0) {
-              setPosts(supabasePosts);
-              localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(supabasePosts));
-            }
-          } catch (supabaseError) {
-            console.error("Failed to load from Supabase, using local data", supabaseError);
-          }
+        // Load posts from API
+        const postsResponse = await fetch('/api/posts');
+        if (postsResponse.ok) {
+          const apiPosts = await postsResponse.json();
+          const formattedPosts: Post[] = apiPosts.map((post: any) => ({
+            id: post.id,
+            taskId: post.task_id,
+            title: post.title,
+            content: post.content,
+            createdAt: post.created_at,
+          }));
+          setPosts(formattedPosts);
+        } else {
+          throw new Error('Failed to fetch posts');
         }
       } catch (error) {
-        console.error("Failed to load data", error);
-        setPosts(fallbackPosts);
-        setTasks(fallbackTasks);
-        // Ensure fallback data is saved
-        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-        localStorage.setItem(POSTS_STORAGE_KEY, JSON.stringify(fallbackPosts));
+        console.error("Failed to load data from API", error);
+        setPosts([]);
+        setTasks([]);
       }
     };
     

@@ -15,8 +15,8 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
-import { Home, Settings, Plus, Star, Pencil, Check, X } from 'lucide-react';
-import { mockTasks as fallbackTasks } from '@/lib/mock-data';
+import { Home, Settings, Plus, Star, Pencil, Check, X, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { getIcon } from '@/lib/icons';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePathname } from 'next/navigation';
@@ -26,7 +26,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { Task } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { SupabaseProvider } from '@/components/supabase-provider';
-import { saveTasks, loadTasksFromSupabase } from '@/hooks/use-supabase-sync';
 
 const TASKS_STORAGE_KEY = 'taskforge-tasks';
 
@@ -36,37 +35,30 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskName, setEditingTaskName] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { state: sidebarState } = useSidebar();
 
   const loadTasks = async () => {
     try {
-      // Always load from localStorage first for immediate display
-      const storedTasksRaw = localStorage.getItem(TASKS_STORAGE_KEY);
-      if (storedTasksRaw) {
-        setTasks(JSON.parse(storedTasksRaw));
+      const response = await fetch('/api/tasks');
+      if (response.ok) {
+        const apiTasks = await response.json();
+        const formattedTasks: Task[] = apiTasks.map((task: any) => ({
+          id: task.id,
+          name: task.name,
+          icon: task.icon,
+          color: task.color,
+          description: task.description || undefined,
+        }));
+        setTasks(formattedTasks);
       } else {
-        localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
-        setTasks(fallbackTasks);
-      }
-
-      // Then try to load from Supabase if online
-      if (navigator.onLine) {
-        try {
-          const supabaseTasks = await loadTasksFromSupabase();
-          if (supabaseTasks.length > 0) {
-            setTasks(supabaseTasks);
-            localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(supabaseTasks));
-          }
-        } catch (supabaseError) {
-          console.error("Failed to load from Supabase, using local data", supabaseError);
-        }
+        throw new Error('Failed to fetch tasks');
       }
     } catch (error) {
       console.error("Failed to load tasks", error);
-      setTasks(fallbackTasks);
-      // Ensure fallback data is saved
-      localStorage.setItem(TASKS_STORAGE_KEY, JSON.stringify(fallbackTasks));
+      setTasks([]);
     }
   }
 
@@ -111,12 +103,40 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
       });
       return;
     }
-    const updatedTasks = tasks.map(t => t.id === editingTaskId ? { ...t, name: editingTaskName } : t);
-    setTasks(updatedTasks);
     try {
-      await saveTasks(updatedTasks);
+      const response = await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingTaskId,
+          name: editingTaskName,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
+
+      const updatedTaskData = await response.json();
+      const updatedTask: Task = {
+        id: updatedTaskData.id,
+        name: updatedTaskData.name,
+        icon: updatedTaskData.icon,
+        color: updatedTaskData.color,
+        description: updatedTaskData.description || undefined,
+      };
+
+      setTasks(tasks.map(t => t.id === editingTaskId ? updatedTask : t));
     } catch (error) {
-      console.error("Failed to save tasks", error);
+      console.error("Failed to update task", error);
+      toast({
+        variant: 'destructive',
+        title: '오류',
+        description: '태스크 업데이트 중 오류가 발생했습니다.',
+      });
+      return;
     }
 
     toast({
@@ -124,6 +144,43 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
         description: '태스크 이름이 성공적으로 저장되었습니다.',
     });
     handleCancelEdit();
+  };
+
+  const handleDeleteClick = (task: Task, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setTaskToDelete(task);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!taskToDelete) return;
+    
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: taskToDelete.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete task');
+      }
+
+      setTasks(tasks.filter((task) => task.id !== taskToDelete.id));
+      toast({ title: '태스크 삭제됨', description: '태스크가 성공적으로 삭제되었습니다.' });
+      setDeleteDialogOpen(false);
+      setTaskToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete task", error);
+      toast({ 
+        variant: 'destructive',
+        title: '오류', 
+        description: '태스크 삭제 중 오류가 발생했습니다.' 
+      });
+    }
   };
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -196,22 +253,34 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
                       </Button>
                     </div>
                   ) : (
-                    <Link href={`/tasks/${task.id}`}>
-                      <SidebarMenuButton tooltip={task.name} isActive={pathname === `/tasks/${task.id}`}>
-                        <Icon style={{ color: task.color }} />
-                        <span>{task.name}</span>
-                         <SidebarMenuAction
-                            showOnHover
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleEditClick(task);
-                            }}
-                          >
-                            <Pencil />
-                          </SidebarMenuAction>
-                      </SidebarMenuButton>
-                    </Link>
+                    <div className="w-full group">
+                      <Link href={`/tasks/${task.id}`} className="flex-1">
+                        <SidebarMenuButton tooltip={task.name} isActive={pathname === `/tasks/${task.id}`} className="w-full justify-between">
+                          <div className="flex items-center gap-2">
+                            <Icon style={{ color: task.color }} />
+                            <span>{task.name}</span>
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            <button
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleEditClick(task);
+                              }}
+                              className="p-1 rounded hover:bg-muted transition-colors duration-200"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteClick(task, e)}
+                              className="p-1 rounded text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors duration-200"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </SidebarMenuButton>
+                      </Link>
+                    </div>
                   )}
                 </SidebarMenuItem>
               );
@@ -239,6 +308,45 @@ function AppLayoutContent({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarFooter>
       </Sidebar>
+      
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="text-center sm:text-left">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                <Trash2 className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-semibold">태스크 삭제</DialogTitle>
+              </div>
+            </div>
+            <DialogDescription className="text-sm text-muted-foreground">
+              <strong>"{taskToDelete?.name}"</strong> 태스크를 삭제하시겠습니까?
+              <br />
+              <span className="text-xs mt-1 block text-destructive/70">
+                ⚠️ 이 작업은 되돌릴 수 없으며, 관련된 모든 게시물도 함께 삭제됩니다.
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2 flex-col sm:flex-row">
+            <DialogClose asChild>
+              <Button variant="outline" className="order-2 sm:order-1">
+                취소
+              </Button>
+            </DialogClose>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteConfirm}
+              className="order-1 sm:order-2"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              영구 삭제
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <div className={cn("flex flex-1 flex-col transition-[margin-left] duration-300 ease-in-out", sidebarState === 'collapsed' ? "md:ml-16" : "md:ml-64")}>
         <header className="flex h-14 lg:h-[60px] items-center gap-4 border-b bg-card px-6 sticky top-0 z-30">
            <div className="flex-1">
